@@ -86,6 +86,13 @@ export interface InboundServerRecord {
   readonly provider?: string
   /** Per-instance model id override; absent = the deployment default. */
   readonly model?: string
+  /**
+   * Per-instance advertised base URL written into the agent card (scheme, host
+   * and optional port, never a path). Absent = the deployment `baseUrl` config.
+   * Use it when a deployment (or one front door of it) must be reachable from a
+   * different address than the loopback the server binds.
+   */
+  readonly baseUrl?: string
 }
 
 /** One durable outbound server connection instance. */

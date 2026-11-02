@@ -66,6 +66,7 @@ export interface InboundServerView {
   readonly workspace?: string
   readonly provider?: string
   readonly model?: string
+  readonly baseUrl?: string
   readonly skills: readonly SkillView[]
 }
 
@@ -314,6 +315,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
   const [inWorkspace, setInWorkspace] = useState('')
   const [models, setModels] = useState<readonly ModelOption[]>([])
   const [inModelKey, setInModelKey] = useState('')
+  // Advertised base URL override (blank = the deployment baseUrl config).
+  const [inBaseUrl, setInBaseUrl] = useState('')
 
   // Outbound add/edit form (two-phase).
   const [editingOut, setEditingOut] = useState<string | null>(null)
@@ -453,6 +456,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInTrace(false)
     setInWorkspace('')
     setInModelKey('')
+    setInBaseUrl('')
   }
 
   const beginEditInbound = (v: InboundServerView): void => {
@@ -466,6 +470,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInTrace(v.trace)
     setInWorkspace(v.workspace ?? '')
     setInModelKey(modelKey(v.provider, v.model))
+    setInBaseUrl(v.baseUrl ?? '')
   }
 
   const submitInbound = async (): Promise<void> => {
@@ -480,6 +485,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
       workspace: inWorkspace.trim(),
       provider: splitModelKey(inModelKey).provider,
       model: splitModelKey(inModelKey).model,
+      baseUrl: inBaseUrl.trim(),
     }
     const done = editingIn === null
       ? await control({ action: 'inbound.create', ...base })
@@ -679,6 +685,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                             ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'model' }, [v.provider, v.model].filter((x): x is string => x !== undefined && x.length > 0).join('/'))]
                             : []),
                           ...(v.workspace !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'ws', title: v.workspace }, 'cwd')] : []),
+                          ...(v.baseUrl !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'base', title: v.baseUrl }, 'base')] : []),
                           createElement('span', { className: 'dsh-a2a-auth' }, v.authTokenEnv !== undefined ? '· 已配置鉴权' : '· 匿名'),
                         ),
                         createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `${v.endpointPath} · ${v.cardUrl ?? v.cardPath}`),
@@ -713,6 +720,14 @@ export function A2aSection(_props: SectionProps): ReactElement {
                   placeholder: editingIn !== null ? '工作空间绝对路径（留空 = 恢复默认 ~/.dsh/a2a-sessions）' : '工作空间绝对路径（可选，留空 = 默认 ~/.dsh/a2a-sessions）',
                   style: { flex: 1, minWidth: '280px' },
                   onChange: (e: { target: { value: string } }) => setInWorkspace(e.target.value),
+                }),
+                createElement('input', {
+                  className: 'dsh-a2a-input',
+                  value: inBaseUrl,
+                  placeholder: editingIn !== null ? '广告地址（留空 = 恢复部署默认）' : '广告地址（如 http://192.168.31.20，留空 = 部署默认）',
+                  title: '写进 Agent Card 的对外基地址（外部 A2A 客户端靠它回连；不含路径）',
+                  style: { flex: 1, minWidth: '280px' },
+                  onChange: (e: { target: { value: string } }) => setInBaseUrl(e.target.value),
                 }),
                 createElement('select', {
                   className: 'dsh-a2a-select',

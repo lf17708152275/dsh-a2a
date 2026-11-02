@@ -16,7 +16,9 @@ import {
   DomainInboundStore,
   InboundServerManager,
   buildModelOverride,
+  resolveInstanceBaseUrl,
   resolveInstanceCwd,
+  validateBaseUrl,
   trimOptional,
   validateWorkspace,
   type InboundManagerHost,
@@ -148,6 +150,49 @@ describe('buildModelOverride', () => {
   })
 })
 
+describe('validateBaseUrl', () => {
+  it('accepts an omitted baseUrl (inherit deployment default)', () => {
+    expect(validateBaseUrl(undefined)).toEqual({ ok: true })
+  })
+
+  it('treats a blank baseUrl as inherit default', () => {
+    expect(validateBaseUrl('   ')).toEqual({ ok: true })
+  })
+
+  it('accepts an absolute http URL and trims whitespace and the trailing slash', () => {
+    expect(validateBaseUrl('  http://192.168.31.20/  ')).toEqual({ ok: true, value: 'http://192.168.31.20' })
+  })
+
+  it('accepts an https URL with a path-free origin', () => {
+    expect(validateBaseUrl('https://companion.example.com')).toEqual({ ok: true, value: 'https://companion.example.com' })
+  })
+
+  it('rejects a relative value', () => {
+    const result = validateBaseUrl('/a2a/family')
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('unreachable')
+    expect(result.message).toContain('must be an absolute URL')
+  })
+
+  it('rejects a non-http scheme', () => {
+    const result = validateBaseUrl('ftp://192.168.31.20')
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('unreachable')
+    expect(result.message).toContain('must use http or https')
+  })
+})
+
+describe('resolveInstanceBaseUrl', () => {
+  it('prefers the record override', () => {
+    expect(resolveInstanceBaseUrl({ baseUrl: 'https://edge.example.com' }, 'http://127.0.0.1:25675'))
+      .toBe('https://edge.example.com')
+  })
+
+  it('falls back to the deployment base url', () => {
+    expect(resolveInstanceBaseUrl({}, 'http://127.0.0.1:25675')).toBe('http://127.0.0.1:25675')
+  })
+})
+
 describe('trimOptional', () => {
   it('collapses blanks and undefined to undefined', () => {
     expect(trimOptional(undefined)).toBeUndefined()
@@ -205,6 +250,72 @@ describe('InboundServerManager overrides', () => {
     expect(cleared.ok).toBe(true)
     expect(rows.get(id)?.model).toBeUndefined()
     expect(rows.get(id)?.workspace).toBeUndefined()
+  })
+
+  it('persists the advertised baseUrl override on create', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, baseUrl: ' http://192.168.31.20/ ' })
+    expect(created.ok).toBe(true)
+    expect(rows.get(created.id!)?.baseUrl).toBe('http://192.168.31.20')
+  })
+
+  it('omits the baseUrl override that was not supplied', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base })
+    expect(created.ok).toBe(true)
+    expect(rows.get(created.id!)?.baseUrl).toBeUndefined()
+  })
+
+  it('refuses to create with a non-absolute baseUrl', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, baseUrl: 'edge.example.com' })
+    expect(created.ok).toBe(false)
+    expect(created.message).toContain('must be an absolute URL')
+    expect(rows.size).toBe(0)
+  })
+
+  it('updates and clears the baseUrl override with a blank value', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, baseUrl: 'http://192.168.31.20' })
+    const id = created.id!
+
+    const updated = await manager.update(id, { baseUrl: 'https://companion.example.com/' })
+    expect(updated.ok).toBe(true)
+    expect(rows.get(id)?.baseUrl).toBe('https://companion.example.com')
+
+    const cleared = await manager.update(id, { baseUrl: '' })
+    expect(cleared.ok).toBe(true)
+    expect(rows.get(id)?.baseUrl).toBeUndefined()
+  })
+
+  it('refuses an update with a non-http baseUrl', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, baseUrl: 'http://192.168.31.20' })
+    const id = created.id!
+    const updated = await manager.update(id, { baseUrl: 'ftp://192.168.31.20' })
+    expect(updated.ok).toBe(false)
+    expect(rows.get(id)?.baseUrl).toBe('http://192.168.31.20')
+  })
+
+  it('advertises the per-instance baseUrl in the assembled agent card', async () => {
+    const { store } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, baseUrl: 'https://companion.example.com' })
+    const card = manager.get(created.id!)?.card as { supportedInterfaces?: Array<{ url?: string }> }
+    expect(card.supportedInterfaces?.[0]?.url).toBe(`https://companion.example.com/a2a/${created.id}`)
+  })
+
+  it('falls back to the deployment base url in the card when unset', async () => {
+    const { store } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base })
+    const card = manager.get(created.id!)?.card as { supportedInterfaces?: Array<{ url?: string }> }
+    expect(card.supportedInterfaces?.[0]?.url).toBe(`http://127.0.0.1:25675/a2a/${created.id}`)
   })
 
   it('refuses an update that points at a non-directory', async () => {

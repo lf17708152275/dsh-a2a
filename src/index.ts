@@ -232,6 +232,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       ...(r.workspace !== undefined ? { workspace: r.workspace } : {}),
       ...(r.provider !== undefined ? { provider: r.provider } : {}),
       ...(r.model !== undefined ? { model: r.model } : {}),
+      ...(r.baseUrl !== undefined ? { baseUrl: r.baseUrl } : {}),
       skills: live.skills.map((s): SkillView => ({ id: s.id, name: s.name, ...(s.description != null ? { description: s.description } : {}) })),
     }
   }
@@ -332,6 +333,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
         ...(input.workspace !== undefined ? { workspace: input.workspace } : {}),
         ...(input.provider !== undefined ? { provider: input.provider } : {}),
         ...(input.model !== undefined ? { model: input.model } : {}),
+        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
       })
       host.logger(`[a2a] inbound created: ${result.message}`)
       audit('inbound.create', result.message, result.id)
@@ -347,7 +349,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       audit('inbound.enable', result.message, id)
       return result
     },
-    async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string }): Promise<OpResult> {
+    async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; baseUrl?: string }): Promise<OpResult> {
       const result = await host.inboundManager.update(id, patch)
       audit('inbound.update', result.message, id)
       return result

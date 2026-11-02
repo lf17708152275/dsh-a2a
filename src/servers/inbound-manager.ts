@@ -130,6 +130,13 @@ export interface InboundCreateInput {
   readonly provider?: string
   /** Model id override for this instance; absent = deployment default. */
   readonly model?: string
+  /**
+   * Advertised base URL for this instance's agent card (e.g.
+   * `https://companion.example.com`). Absent (or blank) = the deployment
+   * `baseUrl` config. Only the advertised URL changes; the routes are still
+   * served by the host web server.
+   */
+  readonly baseUrl?: string
 }
 
 /** Validate an optional per-instance workspace override (absolute + existing dir). */
@@ -146,6 +153,31 @@ export function validateWorkspace(raw: string | undefined): { readonly ok: true;
     return { ok: false, message: `workspace does not exist: ${trimmed}` }
   }
   return { ok: true, value: trimmed }
+}
+
+/**
+ * Validate an optional per-instance advertised base URL. The value must be an
+ * absolute `http(s)` URL; a trailing slash is trimmed so card URLs join paths
+ * consistently. Blank = inherit the deployment base URL.
+ */
+export function validateBaseUrl(raw: string | undefined): { readonly ok: true; readonly value?: string } | { readonly ok: false; readonly message: string } {
+  const trimmed = trimOptional(raw)
+  if (trimmed === undefined) return { ok: true }
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    return { ok: false, message: `baseUrl must be an absolute URL: ${trimmed}` }
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, message: `baseUrl must use http or https: ${trimmed}` }
+  }
+  return { ok: true, value: trimmed.replace(/\/$/, '') }
+}
+
+/** Per-instance advertised base URL, or the deployment default. */
+export function resolveInstanceBaseUrl(record: Pick<InboundServerRecord, 'baseUrl'>, deploymentBaseUrl: string): string {
+  return record.baseUrl ?? deploymentBaseUrl
 }
 
 /** Trim an optional text override; blank collapses to undefined. */
@@ -257,7 +289,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
   const modelOverride = buildModelOverride(record)
   const tasks = new ScopedTaskStore(host.tasks, record.id)
   const card = buildCard({
-    baseUrl: host.defaultBaseUrl,
+    baseUrl: resolveInstanceBaseUrl(record, host.defaultBaseUrl),
     endpointPath,
     name: record.name,
     description: record.description,
@@ -465,6 +497,8 @@ export class InboundServerManager {
     if (this.live.has(id)) return { ok: false, message: `inbound server ${id} already exists` }
     const workspace = validateWorkspace(input.workspace)
     if (!workspace.ok) return { ok: false, message: workspace.message }
+    const advertisedBaseUrl = validateBaseUrl(input.baseUrl)
+    if (!advertisedBaseUrl.ok) return { ok: false, message: advertisedBaseUrl.message }
     const provider = trimOptional(input.provider)
     const model = trimOptional(input.model)
     const preset = input.preset ?? this.host.defaultPresetId
@@ -480,6 +514,7 @@ export class InboundServerManager {
       ...(workspace.value !== undefined ? { workspace: workspace.value } : {}),
       ...(provider !== undefined ? { provider } : {}),
       ...(model !== undefined ? { model } : {}),
+      ...(advertisedBaseUrl.value !== undefined ? { baseUrl: advertisedBaseUrl.value } : {}),
       enabled: input.enabled ?? true,
     }
     try {
@@ -496,7 +531,7 @@ export class InboundServerManager {
   }
 
   /** Persist, rebuild (re-deriving skills), and apply a patch onto a live instance. */
-  async update(id: string, patch: Partial<Pick<InboundServerRecord, 'name' | 'description' | 'version' | 'endpointPath' | 'preset' | 'authTokenEnv' | 'trace' | 'workspace' | 'provider' | 'model'>>): Promise<OpResult> {
+  async update(id: string, patch: Partial<Pick<InboundServerRecord, 'name' | 'description' | 'version' | 'endpointPath' | 'preset' | 'authTokenEnv' | 'trace' | 'workspace' | 'provider' | 'model' | 'baseUrl'>>): Promise<OpResult> {
     const live = this.live.get(id)
     const stored = this.store.get(id)
     if (live === undefined || stored === undefined) return { ok: false, message: `inbound server ${id} not found` }
@@ -504,12 +539,17 @@ export class InboundServerManager {
       const workspace = validateWorkspace(patch.workspace)
       if (!workspace.ok) return { ok: false, message: workspace.message }
     }
+    if (patch.baseUrl !== undefined) {
+      const baseUrl = validateBaseUrl(patch.baseUrl)
+      if (!baseUrl.ok) return { ok: false, message: baseUrl.message }
+    }
     // Overrides are additive and clearable: an explicit blank string removes the
     // override so the instance falls back to the deployment default again.
-    const { workspace: _dropWs, provider: _dropProv, model: _dropModel, ...base } = stored
+    const { workspace: _dropWs, provider: _dropProv, model: _dropModel, baseUrl: _dropBase, ...base } = stored
     const nextWorkspace = patch.workspace !== undefined ? trimOptional(patch.workspace) : stored.workspace
     const nextProvider = patch.provider !== undefined ? trimOptional(patch.provider) : stored.provider
     const nextModel = patch.model !== undefined ? trimOptional(patch.model) : stored.model
+    const nextBaseUrl = patch.baseUrl !== undefined ? trimOptional(patch.baseUrl)?.replace(/\/$/, '') : stored.baseUrl
     const next: InboundServerRecord = {
       ...base,
       name: patch.name ?? stored.name,
@@ -522,6 +562,7 @@ export class InboundServerManager {
       ...(nextWorkspace !== undefined ? { workspace: nextWorkspace } : {}),
       ...(nextProvider !== undefined ? { provider: nextProvider } : {}),
       ...(nextModel !== undefined ? { model: nextModel } : {}),
+      ...(nextBaseUrl !== undefined ? { baseUrl: nextBaseUrl } : {}),
       enabled: stored.enabled,
     }
     try {

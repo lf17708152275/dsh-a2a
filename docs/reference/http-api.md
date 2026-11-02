@@ -124,8 +124,8 @@ host exports `DSH_PROFILE`. When no source answers, the endpoint still returns
 
 | Action | Required fields | Optional fields |
 |---|---|---|
-| `inbound.create` | `name`, `description`, `version` | `endpointPath`, `preset`, `authTokenEnv`, `trace`, `enabled`, `workspace`, `provider`, `model` |
-| `inbound.update` | `id` | `name`, `description`, `version`, `endpointPath`, `preset`, `authTokenEnv`, `trace`, `workspace`, `provider`, `model` |
+| `inbound.create` | `name`, `description`, `version` | `endpointPath`, `preset`, `authTokenEnv`, `trace`, `enabled`, `workspace`, `provider`, `model`, `baseUrl` |
+| `inbound.update` | `id` | `name`, `description`, `version`, `endpointPath`, `preset`, `authTokenEnv`, `trace`, `workspace`, `provider`, `model`, `baseUrl` |
 | `inbound.remove` | `id` | — |
 | `inbound.enable` / `inbound.disable` | `id` | — |
 | `inbound.setAuth` | `id` | `token` (omit or empty to clear) |
@@ -144,6 +144,14 @@ overriding the deployment default for that instance only. Both fields are
 optional and independent; omitted (or empty) values fall back to the
 deployment default model. Passing an empty string on `inbound.update` clears a
 previously stored override.
+
+`baseUrl` overrides the base URL advertised in this instance's agent card
+(for example `http://192.168.31.20` or `https://companion.example.com`). Use it
+when the server binds loopback behind a reverse proxy or tunnel and external
+clients must call back through another address. It must be an absolute
+`http(s)` URL without a path; a trailing slash is trimmed. Omitted (or empty)
+means "inherit the deployment `baseUrl` config". Only the advertised URL
+changes — the routes keep being served by the host web server.
 
 `inbound.sendTest` runs the same gate and task lifecycle as the wire endpoint
 but bypasses HTTP auth; it is only reachable on loopback.

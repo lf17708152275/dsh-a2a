@@ -119,8 +119,8 @@ reasoning block；它不是 A2A 线协议的一部分，也不会通过 A2A 暴�
 
 | 动作 | 必填字段 | 可选字段 |
 |---|---|---|
-| `inbound.create` | `name`、`description`、`version` | `endpointPath`、`preset`、`authTokenEnv`、`trace`、`enabled`、`workspace`、`provider`、`model` |
-| `inbound.update` | `id` | `name`、`description`、`version`、`endpointPath`、`preset`、`authTokenEnv`、`trace`、`workspace`、`provider`、`model` |
+| `inbound.create` | `name`、`description`、`version` | `endpointPath`、`preset`、`authTokenEnv`、`trace`、`enabled`、`workspace`、`provider`、`model`、`baseUrl` |
+| `inbound.update` | `id` | `name`、`description`、`version`、`endpointPath`、`preset`、`authTokenEnv`、`trace`、`workspace`、`provider`、`model`、`baseUrl` |
 | `inbound.remove` | `id` | — |
 | `inbound.enable` / `inbound.disable` | `id` | — |
 | `inbound.setAuth` | `id` | `token`（省略或空串即清除） |
@@ -135,6 +135,12 @@ context id。
 `provider` / `model` 为单个入站实例固定模型选择，只覆盖该实例而不影响部署默认。
 两字段相互独立，省略或留空即回落到部署默认模型；在 `inbound.update` 里传空串
 可清除此前保存的覆盖值。
+
+`baseUrl` 覆盖该实例 Agent Card 里广告的基地址（例如
+`http://192.168.31.20` 或 `https://companion.example.com`）。当服务只绑回环、
+前面有反代或隧道、而外部客户端必须走另一个地址回连时用它。必须是**不含路径**的
+绝对 `http(s)` URL，末尾斜杠会被去掉；省略或留空表示继承部署级 `baseUrl` 配置。
+它只改广告地址，实际路由仍由宿主 web server 提供。
 
 `inbound.sendTest` 走与线上端点相同的门禁和任务生命周期，但不走 HTTP 鉴权；
 它只能从回环调用。

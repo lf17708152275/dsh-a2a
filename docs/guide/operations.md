@@ -56,11 +56,13 @@ chips and the live card URL. Actions:
 | **Delete** | Disposes the live instance and removes the persisted record |
 | **Clear auth** | Appears on an authenticated instance; removes the stored token and rebuilds it anonymously |
 
-The create/edit form has name, version, preset, workspace, provider, model,
-bearer token and description. `workspace` (absolute path to an existing
-directory) pins that instance's agent sessions to a local project; `provider`
-and `model` pin its model selection. All three are optional and inherit the
-deployment default when left empty.
+The create/edit form has name, version, preset, workspace, advertised base URL,
+provider, model, bearer token and description. `workspace` (absolute path to an
+existing directory) pins that instance's agent sessions to a local project;
+`provider` and `model` pin its model selection; the advertised base URL changes
+the address written into this instance's agent card so external A2A clients call
+back through a reachable host. All four are optional and inherit the deployment
+default when left empty.
 Skills are shown after creation; you do not type them. The preset picker lists
 the real roster and preselects the deployment default.
 
