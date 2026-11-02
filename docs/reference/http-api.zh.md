@@ -28,6 +28,7 @@ update-time: 2026-10-25
 | `GET /a2a/api` | 快照：`{ version, inbounds, outbounds, tasks, taskTotal, taskNextOffset, peers, sessions, metrics }` |
 | `GET /a2a/api/presets` | Agent preset 名单 + 每个预设会挂载的插件：`[{ id, name?, description?, isDefault?, broken?, plugins?: [{ entryId, module, label?, hint?, enabled, condition? }] }]` |
 | `GET /a2a/api/models` | 可路由模型清单：`[{ provider, id, name }]`（宿主没有 LLM 服务时返回空数组） |
+| `GET /a2a/api/tools` | 全局工具清单：`[{ name, description? }]`，供入站的工具白名单勾选（宿主没有 tools 服务时返回空数组） |
 | `GET /a2a/api/update` | 插件版本与更新检查结果；`?refresh=1` 跳过缓存 |
 | `GET /a2a/api/card?id=<inbound>` | 一个入站 AgentCard；未知 id 返回 `404` |
 | `GET /a2a/api/task?id=<task>` | 一条任务；未知 id 返回 `404` |
@@ -124,8 +125,8 @@ reasoning block；它不是 A2A 线协议的一部分，也不会通过 A2A 暴�
 
 | 动作 | 必填字段 | 可选字段 |
 |---|---|---|
-| `inbound.create` | `name`、`description`、`version` | `endpointPath`、`preset`、`authTokenEnv`、`trace`、`enabled`、`workspace`、`provider`、`model`、`baseUrl` |
-| `inbound.update` | `id` | `name`、`description`、`version`、`endpointPath`、`preset`、`authTokenEnv`、`trace`、`workspace`、`provider`、`model`、`baseUrl` |
+| `inbound.create` | `name`、`description`、`version` | `endpointPath`、`preset`、`authTokenEnv`、`trace`、`enabled`、`workspace`、`provider`、`model`、`toolAllow`、`baseUrl` |
+| `inbound.update` | `id` | `name`、`description`、`version`、`endpointPath`、`preset`、`authTokenEnv`、`trace`、`workspace`、`provider`、`model`、`toolAllow`、`baseUrl` |
 | `inbound.remove` | `id` | — |
 | `inbound.enable` / `inbound.disable` | `id` | — |
 | `inbound.setAuth` | `id` | `token`（省略或空串即清除） |
@@ -142,6 +143,13 @@ context id。
 `provider` / `model` 为单个入站实例固定模型选择，只覆盖该实例而不影响部署默认。
 两字段相互独立，省略或留空即回落到部署默认模型；在 `inbound.update` 里传空串
 可清除此前保存的覆盖值。
+
+`toolAllow` 给单个入站实例限定可用的**全局工具**（取值为工具名数组，例如
+`["sticker_search", "sticker_send"]`）。设置后该实例的 agent 作用域只保留这些工具，
+其余工具连同 schema 一起移出请求上下文——纯对话端点能因此省掉大量每轮 token。
+省略或空数组表示不限制，保留部署提供的全部工具。改动在**新建会话**时生效；
+已存在的 context 沿用创建时的工具集，可用 `inbound.close` 或客户端「换新会话」换掉。
+工具名可从 `GET /a2a/api/tools` 取得。
 
 `baseUrl` 是**接口级**的实例广告地址覆盖（例如 `http://192.168.31.20`）。必须是
 **不含路径**的绝对 `http(s)` URL，末尾斜杠会被去掉；省略或留空表示继承部署级

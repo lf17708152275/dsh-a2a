@@ -153,6 +153,11 @@ export interface InboundCreateInput {
   /** Model id override for this instance; absent = deployment default. */
   readonly model?: string
   /**
+   * Tool allow-list for this instance's sessions (global tool names). Absent or
+   * empty = every tool the deployment mounts stays visible.
+   */
+  readonly toolAllow?: readonly string[]
+  /**
    * Advertised base URL for this instance's agent card (e.g.
    * `https://companion.example.com`). Absent (or blank) = the deployment
    * `baseUrl` config. Only the advertised URL changes; the routes are still
@@ -239,6 +244,32 @@ export function trimOptional(raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined
   const trimmed = raw.trim()
   return trimmed.length > 0 ? trimmed : undefined
+}
+
+/** Global tool names accepted in a per-instance allow-list. */
+const TOOL_NAME_RE = /^[A-Za-z0-9_.:-]{1,120}$/
+const MAX_TOOL_ALLOW = 200
+
+/** Validate an optional per-instance tool allow-list. */
+export function validateToolAllow(raw: readonly string[] | undefined): { readonly ok: true; readonly value?: readonly string[] } | { readonly ok: false; readonly message: string } {
+  if (raw === undefined) return { ok: true }
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (typeof item !== 'string') return { ok: false, message: 'toolAllow must be a list of tool names' }
+    const name = item.trim()
+    if (name.length === 0) continue
+    if (!TOOL_NAME_RE.test(name)) return { ok: false, message: `invalid tool name: ${name}` }
+    seen.add(name)
+  }
+  if (seen.size > MAX_TOOL_ALLOW) return { ok: false, message: `toolAllow holds at most ${MAX_TOOL_ALLOW} names` }
+  return { ok: true, ...(seen.size > 0 ? { value: [...seen] } : {}) }
+}
+
+/** Per-instance tool restriction, or undefined when the instance keeps every tool. */
+export function buildToolRestriction(record: InboundServerRecord): { readonly allow: readonly string[] } | undefined {
+  const allow = record.toolAllow
+  if (allow === undefined || allow.length === 0) return undefined
+  return { allow }
 }
 
 /** Per-instance model override, or undefined when the instance inherits the default. */
@@ -382,6 +413,9 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
       // AgentRuntimeOptions.resolveAgentOptions signature under
       // exactOptionalPropertyTypes.
       resolveAgentOptions: () => modelOverride ?? host.resolveDefaultModel?.(),
+      // A chat instance usually needs a handful of tools; masking the rest at
+      // the agent scope keeps their schemas out of every request's context.
+      toolRestriction: () => buildToolRestriction(record),
       // First open of a context's session: persist the contextId → sessionId
       // binding so the durable store agrees with the pool. The scoped store
       // namespaces the binding by inbound instance. The write is memory-first
@@ -577,6 +611,8 @@ export class InboundServerManager {
     if (!advertisedBaseUrl.ok) return { ok: false, message: advertisedBaseUrl.message }
     const provider = trimOptional(input.provider)
     const model = trimOptional(input.model)
+    const toolAllow = validateToolAllow(input.toolAllow)
+    if (!toolAllow.ok) return { ok: false, message: toolAllow.message }
     const preset = trimOptional(input.preset) ?? this.host.defaultPresetId
     const record: InboundServerRecord = {
       id,
@@ -590,6 +626,7 @@ export class InboundServerManager {
       ...(workspace.value !== undefined ? { workspace: workspace.value } : {}),
       ...(provider !== undefined ? { provider } : {}),
       ...(model !== undefined ? { model } : {}),
+      ...(toolAllow.value !== undefined ? { toolAllow: toolAllow.value } : {}),
       ...(advertisedBaseUrl.value !== undefined ? { baseUrl: advertisedBaseUrl.value } : {}),
       enabled: input.enabled ?? true,
     }
@@ -607,7 +644,7 @@ export class InboundServerManager {
   }
 
   /** Persist, rebuild (re-deriving skills), and apply a patch onto a live instance. */
-  async update(id: string, patch: Partial<Pick<InboundServerRecord, 'name' | 'description' | 'version' | 'endpointPath' | 'preset' | 'authTokenEnv' | 'trace' | 'workspace' | 'provider' | 'model' | 'baseUrl'>>): Promise<OpResult> {
+  async update(id: string, patch: Partial<Pick<InboundServerRecord, 'name' | 'description' | 'version' | 'endpointPath' | 'preset' | 'authTokenEnv' | 'trace' | 'workspace' | 'provider' | 'model' | 'toolAllow' | 'baseUrl'>>): Promise<OpResult> {
     const live = this.live.get(id)
     const stored = this.store.get(id)
     if (live === undefined || stored === undefined) return { ok: false, message: `inbound server ${id} not found` }
@@ -621,7 +658,9 @@ export class InboundServerManager {
     }
     // Overrides are additive and clearable: an explicit blank string removes the
     // override so the instance falls back to the deployment default again.
-    const { workspace: _dropWs, provider: _dropProv, model: _dropModel, baseUrl: _dropBase, preset: _dropPreset, ...base } = stored
+    const { workspace: _dropWs, provider: _dropProv, model: _dropModel, toolAllow: _dropTools, baseUrl: _dropBase, preset: _dropPreset, ...base } = stored
+    const nextToolAllow = patch.toolAllow !== undefined ? validateToolAllow(patch.toolAllow) : validateToolAllow(stored.toolAllow)
+    if (!nextToolAllow.ok) return { ok: false, message: nextToolAllow.message }
     const nextWorkspace = patch.workspace !== undefined ? trimOptional(patch.workspace) : stored.workspace
     const nextProvider = patch.provider !== undefined ? trimOptional(patch.provider) : stored.provider
     const nextModel = patch.model !== undefined ? trimOptional(patch.model) : stored.model
@@ -639,6 +678,7 @@ export class InboundServerManager {
       ...(nextWorkspace !== undefined ? { workspace: nextWorkspace } : {}),
       ...(nextProvider !== undefined ? { provider: nextProvider } : {}),
       ...(nextModel !== undefined ? { model: nextModel } : {}),
+      ...(nextToolAllow.value !== undefined ? { toolAllow: nextToolAllow.value } : {}),
       ...(nextBaseUrl !== undefined ? { baseUrl: nextBaseUrl } : {}),
       enabled: stored.enabled,
     }

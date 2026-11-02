@@ -29,6 +29,7 @@ loopback peers (`127.0.0.1`, `::1`, `::ffff:127.0.0.1`); any other peer gets
 | `GET /a2a/api` | Snapshot: `{ version, inbounds, outbounds, tasks, taskTotal, taskNextOffset, peers, sessions, metrics }` |
 | `GET /a2a/api/presets` | Agent-preset roster with the plugins each preset mounts: `[{ id, name?, description?, isDefault?, broken?, plugins?: [{ entryId, module, label?, hint?, enabled, condition? }] }]` |
 | `GET /a2a/api/models` | Routable model catalogue: `[{ provider, id, name }]` (empty when the host exposes no LLM service) |
+| `GET /a2a/api/tools` | Global tool catalogue: `[{ name, description? }]`, used by the inbound tool allow-list (empty when the host exposes no tool registry) |
 | `GET /a2a/api/update` | Plugin version and update-check answer; `?refresh=1` bypasses the cache |
 | `GET /a2a/api/card?id=<inbound>` | One inbound AgentCard; `404` when unknown |
 | `GET /a2a/api/task?id=<task>` | One task; `404` when unknown |
@@ -133,8 +134,8 @@ host exports `DSH_PROFILE`. When no source answers, the endpoint still returns
 
 | Action | Required fields | Optional fields |
 |---|---|---|
-| `inbound.create` | `name`, `description`, `version` | `endpointPath`, `preset`, `authTokenEnv`, `trace`, `enabled`, `workspace`, `provider`, `model`, `baseUrl` |
-| `inbound.update` | `id` | `name`, `description`, `version`, `endpointPath`, `preset`, `authTokenEnv`, `trace`, `workspace`, `provider`, `model`, `baseUrl` |
+| `inbound.create` | `name`, `description`, `version` | `endpointPath`, `preset`, `authTokenEnv`, `trace`, `enabled`, `workspace`, `provider`, `model`, `toolAllow`, `baseUrl` |
+| `inbound.update` | `id` | `name`, `description`, `version`, `endpointPath`, `preset`, `authTokenEnv`, `trace`, `workspace`, `provider`, `model`, `toolAllow`, `baseUrl` |
 | `inbound.remove` | `id` | — |
 | `inbound.enable` / `inbound.disable` | `id` | — |
 | `inbound.setAuth` | `id` | `token` (omit or empty to clear) |
@@ -156,6 +157,15 @@ overriding the deployment default for that instance only. Both fields are
 optional and independent; omitted (or empty) values fall back to the
 deployment default model. Passing an empty string on `inbound.update` clears a
 previously stored override.
+
+`toolAllow` pins the **global tools** one inbound instance may see (an array of
+tool names, e.g. `["sticker_search", "sticker_send"]`). When set, the instance's
+agent scope keeps only those tools; every other tool — and its schema — leaves
+the request context, which is what a chat-only endpoint needs to stop paying for
+developer tool schemas on every turn. Omit it (or pass `[]`) for the deployment's
+full tool surface. The catalogue is available from `GET /a2a/api/tools`, and the
+mask applies when a session is **created**; already-open contexts keep their
+tool set, so rotate the context to adopt a new mask.
 
 `baseUrl` is an API-level override of the base URL advertised in this
 instance's agent card (for example `http://192.168.31.20`). It must be an

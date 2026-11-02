@@ -26,7 +26,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdirSync } from 'node:fs'
 import { openDomain, DomainTaskStore, type A2aDomain, type TaskStore } from './server/store.ts'
-import type { ModelOptionView } from './service.ts'
+import type { ModelOptionView, ToolOptionView } from './service.ts'
 import { probeService, type AgentPresetsLike, type AgentRegistryLike, type AttachmentsLike, type CredentialsLike, type SkillsLike } from './server/exec/agent-runtime.ts'
 import { nameNewSession, type SessionRenamerLike } from './server/session-titles.ts'
 import { aggregateSessionViews, type SessionView } from './server/session-registry.ts'
@@ -287,6 +287,7 @@ export function apply(ctx: Context, config: A2AConfig) {
         logger: logger.info.bind(logger),
         listModels: () => listAvailableModels(ctx),
         modelDiagnostics: async () => (await probeModelCatalogue(ctx)).diagnostics,
+        listTools: () => listAvailableTools(ctx),
         defaultBaseUrl: effectiveBaseUrl,
         ...(config.baseUrl !== undefined ? { configBaseUrl: config.baseUrl } : {}),
         deploymentSettings: () => deploymentSettings,
@@ -363,6 +364,8 @@ interface FacadeHost {
   readonly listModels?: (() => Promise<ModelOptionView[]>) | undefined
   /** Diagnostics for the catalogue probe, surfaced by `?debug=1`. */
   readonly modelDiagnostics?: (() => Promise<Record<string, unknown>>) | undefined
+  /** Global tool catalogue of the deployment (empty when the registry is absent). */
+  readonly listTools?: (() => Promise<readonly ToolOptionView[]>) | undefined
   /** Deployment advertised base URL; `auto` means request-derived per instance. */
   readonly defaultBaseUrl?: string | (() => string) | undefined
   /** Loader-level `baseUrl` config, shown as the inherit target in the GUI. */
@@ -410,6 +413,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       ...(r.workspace !== undefined ? { workspace: r.workspace } : {}),
       ...(r.provider !== undefined ? { provider: r.provider } : {}),
       ...(r.model !== undefined ? { model: r.model } : {}),
+      ...(r.toolAllow !== undefined ? { toolAllow: r.toolAllow } : {}),
       ...(effectiveBaseUrl !== undefined ? { baseUrl: effectiveBaseUrl } : {}),
       skills: live.skills.map((s): SkillView => ({ id: s.id, name: s.name, ...(s.description != null ? { description: s.description } : {}) })),
     }
@@ -469,6 +473,13 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
     async models(): Promise<ModelOptionView[]> {
       try {
         return (await host.listModels?.()) ?? []
+      } catch {
+        return []
+      }
+    },
+    async tools(): Promise<ToolOptionView[]> {
+      try {
+        return [...((await host.listTools?.()) ?? [])]
       } catch {
         return []
       }
@@ -564,6 +575,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
         ...(input.workspace !== undefined ? { workspace: input.workspace } : {}),
         ...(input.provider !== undefined ? { provider: input.provider } : {}),
         ...(input.model !== undefined ? { model: input.model } : {}),
+        ...(input.toolAllow !== undefined ? { toolAllow: input.toolAllow } : {}),
         ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
       })
       host.logger(`[a2a] inbound created: ${result.message}`)
@@ -580,7 +592,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       audit('inbound.enable', result.message, id)
       return result
     },
-    async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; baseUrl?: string }): Promise<OpResult> {
+    async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; toolAllow?: readonly string[]; baseUrl?: string }): Promise<OpResult> {
       // Clearing the override returns the endpoint to the deployment default;
       // re-own it so its sessions stay listed.
       if (patch.workspace !== undefined && patch.workspace.trim().length === 0) await host.ensureInboundWorkspace?.()
@@ -792,6 +804,32 @@ function providerIdOf(raw: unknown): string | undefined {
 async function listAvailableModels(ctx: Context): Promise<ModelOptionView[]> {
   try {
     return (await probeModelCatalogue(ctx)).rows
+  } catch {
+    return []
+  }
+}
+
+/** Structural slice of the tool registry we read for the allow-list picker. */
+interface ToolSchemaLike {
+  readonly name?: unknown
+  readonly description?: unknown
+}
+
+interface ToolRegistryLike {
+  schemas?(scope?: unknown): readonly ToolSchemaLike[]
+}
+
+async function listAvailableTools(ctx: Context): Promise<ToolOptionView[]> {
+  const service = probeService(ctx, 'tools', 'schemas') as ToolRegistryLike | undefined
+  if (service?.schemas === undefined) return []
+  try {
+    const rows: ToolOptionView[] = []
+    for (const schema of service.schemas()) {
+      const name = String(schema.name ?? '')
+      if (name.length === 0) continue
+      rows.push(typeof schema.description === 'string' ? { name, description: schema.description } : { name })
+    }
+    return rows.sort((a, b) => a.name.localeCompare(b.name))
   } catch {
     return []
   }

@@ -18,7 +18,9 @@ function fakeAgents() {
   const created = new Map<string, number>()
   const disposed: string[] = []
   const sent: SentMessage[] = []
-  const create = vi.fn(async (opts: { readonly sessionId: string }) => {
+  const setups: Array<(agentCtx: unknown) => Promise<void>> = []
+  const create = vi.fn(async (opts: { readonly sessionId: string; readonly setup?: (agentCtx: unknown) => Promise<void> }) => {
+    if (opts.setup !== undefined) setups.push(opts.setup)
     created.set(opts.sessionId, (created.get(opts.sessionId) ?? 0) + 1)
     const agent: LiveAgent = {
       session: { deriveMessages: () => [] },
@@ -33,7 +35,7 @@ function fakeAgents() {
       }),
     }
   })
-  return { create, created, disposed, sent }
+  return { create, created, disposed, sent, setups }
 }
 
 function poolWith(opts: { onSessionOpened?: (info: { readonly sessionId: string; readonly contextId: string; readonly firstPrompt: string }) => void | Promise<void> } = {}) {
@@ -285,5 +287,37 @@ describe('ContextSessionPool visibility and trace', () => {
     expect(calls[0]?.argsPreview).toContain('[redacted]')
     expect(calls[1]).toMatchObject({ phase: 'end', tool: 'read_file', status: 'ok', durationMs: 250 })
     expect(JSON.stringify(calls)).not.toContain('secret file body')
+  })
+})
+
+describe('ContextSessionPool tool masks', () => {
+  it('installs the mask on the agent scope during setup', async () => {
+    const agents = fakeAgents()
+    const restrict = vi.fn()
+    const pool = new ContextSessionPool(agents as unknown as AgentRegistryLike, {
+      cwd: '/tmp',
+      toolRestriction: () => ({ allow: ['sticker_send'] }),
+    })
+    await pool.agentFor('ctx-mask')
+    expect(agents.setups).toHaveLength(1)
+    await agents.setups[0]!({ tools: { restrict } })
+    expect(restrict).toHaveBeenCalledWith({ allow: ['sticker_send'] })
+  })
+
+  it('skips setup entirely when no preset and no mask are configured', async () => {
+    const agents = fakeAgents()
+    const pool = new ContextSessionPool(agents as unknown as AgentRegistryLike, { cwd: '/tmp' })
+    await pool.agentFor('ctx-open')
+    expect(agents.setups).toHaveLength(0)
+  })
+
+  it('keeps the session alive when the registry refuses the mask', async () => {
+    const agents = fakeAgents()
+    const pool = new ContextSessionPool(agents as unknown as AgentRegistryLike, {
+      cwd: '/tmp',
+      toolRestriction: () => ({ deny: ['bash'] }),
+    })
+    await pool.agentFor('ctx-fail')
+    await expect(agents.setups[0]!({ tools: { restrict: () => { throw new Error('unknown name') } } })).resolves.toBeUndefined()
   })
 })

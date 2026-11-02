@@ -140,6 +140,31 @@ export interface CredentialsLike {
   unset(ref: string): Promise<void>
 }
 
+/** Structural slice of the host `ToolRestriction` (global tool names only). */
+export interface ToolRestrictionLike {
+  readonly allow?: readonly string[]
+  readonly deny?: readonly string[]
+}
+
+/** Structural slice of the host tool registry needed to mask one agent scope. */
+export interface ToolMaskLike {
+  restrict?(filter: ToolRestrictionLike): unknown
+}
+
+/**
+ * Apply a tool mask to one agent scope. The host resolves `restrict` against the
+ * CALLING context, so the mask must be installed on the agent's own context.
+ * @param agentCtx - the context DSH hands to the create/resume `setup` hook.
+ * @param restriction - the allow/deny mask to install.
+ * @returns true when a tool registry accepted the mask.
+ */
+export function applyToolRestriction(agentCtx: unknown, restriction: ToolRestrictionLike): boolean {
+  const tools = (agentCtx as { tools?: ToolMaskLike } | null | undefined)?.tools
+  if (tools?.restrict === undefined) return false
+  tools.restrict(restriction)
+  return true
+}
+
 /** Runtime options shared by the executors. */
 export interface AgentRuntimeOptions {
   /** Absolute cwd frozen into each spawned session's durable header. */
@@ -156,6 +181,12 @@ export interface AgentRuntimeOptions {
   readonly sessionNamespace?: string
   /** Once-per-context hook after the first prompt lands (cosmetic naming). */
   readonly onSessionOpened?: (info: { readonly sessionId: string; readonly contextId: string; readonly firstPrompt: string }) => void | Promise<void>
+  /**
+   * Global-tool mask for each spawned agent scope. `allow` keeps only the named
+   * tools visible (their schemas leave the request context), `deny` removes the
+   * named ones; undefined = the deployment's full tool surface.
+   */
+  readonly toolRestriction?: () => ToolRestrictionLike | undefined
   /**
    * Lift a stale archive flag before the first turn of an opened session.
    * DSH's archived-session gate rejects every proposed step, so an archived
@@ -227,13 +258,25 @@ export class ContextSessionPool {
     const agentOptions = this.opts.resolveAgentOptions?.()
     const withModel = agentOptions ? { agentOptions } : {}
     const presets = this.opts.agentPresets
+    const restriction = this.opts.toolRestriction?.()
     let presetId: string | undefined
     let setup: ((agentCtx: unknown) => Promise<void>) | undefined
     if (presets !== undefined) {
       const wanted = this.opts.presetId?.() ?? undefined
       presetId = (wanted !== undefined ? await presets.resolve(wanted) : await presets.resolve()).id
+    }
+    if (presets !== undefined || restriction !== undefined) {
       setup = async (agentCtx: unknown): Promise<void> => {
-        await presets.mount(agentCtx, presetId!)
+        if (presets !== undefined) await presets.mount(agentCtx, presetId!)
+        if (restriction !== undefined) {
+          try {
+            applyToolRestriction(agentCtx, restriction)
+          } catch (err) {
+            // A mask that cannot be installed must not fail the inbound task;
+            // the session simply keeps the deployment's full tool surface.
+            console.warn(`[a2a] could not apply the tool mask: ${(err as Error).message}`)
+          }
+        }
       }
     }
     const meta: { readonly cwd: string; readonly agentPreset?: string } = presetId

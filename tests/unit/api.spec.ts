@@ -49,6 +49,7 @@ function facadeStub(overrides: Partial<A2AServiceImpl> = {}): A2AServiceImpl {  
     status: () => ({ inbounds: [], outbounds: [], tasks: 0, peers: [] }),
     presets: vi.fn(async () => []),
     models: vi.fn(async () => []),
+    tools: vi.fn(async () => []),
     modelDiagnostics: vi.fn(async () => ({})),
     settings: () => ({ mode: 'inherit' as const, effectiveBaseUrl: 'http://127.0.0.1:25675' }),
     updateSettings: vi.fn(async () => ({ ok: true, message: 'settings updated' })),

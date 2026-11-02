@@ -62,7 +62,13 @@ existing directory) pins that instance's agent sessions to a local project —
 leave it empty and the plugin owns `~/.dsh/a2a-sessions` as a host workspace so
 those sessions stay visible in the host session list;
 `provider` and `model` pin its model selection. All three are optional and
-inherit the deployment default when left empty. The advertised base URL is no
+inherit the deployment default when left empty. The form also carries a **tool
+allow-list**: check the tools this instance may use (a chat-only endpoint can
+keep just `sticker_search` / `sticker_send`); leaving everything unchecked keeps
+the full surface. A checked list removes every other tool — schema included —
+from the request context, which is where a chat-only session saves most of its
+tokens. The mask applies when a session is created; already-open contexts keep
+the tool set they started with. The advertised base URL is no
 longer configured per inbound: the **deployment settings** card at the top of the
 tab owns it for the whole deployment (see below).
 Skills are shown after creation; you do not type them. The preset picker lists

@@ -87,6 +87,13 @@ export interface InboundServerRecord {
   /** Per-instance model id override; absent = the deployment default. */
   readonly model?: string
   /**
+   * Per-instance tool allow-list (global tool names). Present = the instance's
+   * agent sessions see only these tools, which keeps chat presets from paying
+   * for developer tool schemas in every request. Absent = no restriction.
+   * Applied when a session is created; already-open contexts keep their mask.
+   */
+  readonly toolAllow?: readonly string[]
+  /**
    * Per-instance advertised base URL written into the agent card (scheme, host
    * and optional port, never a path). Absent = the deployment `baseUrl` config.
    * Use it when a deployment (or one front door of it) must be reachable from a

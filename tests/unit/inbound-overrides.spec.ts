@@ -16,10 +16,12 @@ import {
   DomainInboundStore,
   InboundServerManager,
   buildModelOverride,
+  buildToolRestriction,
   deriveBaseUrlFromRequest,
   resolveInstanceBaseUrl,
   resolveInstanceCwd,
   validateBaseUrl,
+  validateToolAllow,
   trimOptional,
   validateWorkspace,
   type InboundManagerHost,
@@ -467,5 +469,64 @@ describe('InboundServerManager overrides', () => {
     const updated = await manager.update(id, { workspace: join(root, 'ghost') })
     expect(updated.ok).toBe(false)
     expect(rows.get(id)?.workspace).toBe(root)
+  })
+})
+
+describe('validateToolAllow', () => {
+  it('accepts an omitted allow-list (full tool surface)', () => {
+    expect(validateToolAllow(undefined)).toEqual({ ok: true })
+  })
+
+  it('treats blanks and duplicates as a cleared list', () => {
+    expect(validateToolAllow(['  ', 'bash', 'bash'])).toEqual({ ok: true, value: ['bash'] })
+  })
+
+  it('rejects names that are not tool identities', () => {
+    const result = validateToolAllow(['bash; rm -rf /'])
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('invalid tool name')
+  })
+
+  it('trims values before persisting them', () => {
+    expect(validateToolAllow(['  sticker_send '])).toEqual({ ok: true, value: ['sticker_send'] })
+  })
+})
+
+describe('buildToolRestriction', () => {
+  it('is undefined when the record keeps every tool', () => {
+    expect(buildToolRestriction({ id: 'a' } as InboundServerRecord)).toBeUndefined()
+    expect(buildToolRestriction({ id: 'a', toolAllow: [] } as InboundServerRecord)).toBeUndefined()
+  })
+
+  it('wraps the allow-list in the host restriction shape', () => {
+    expect(buildToolRestriction({ id: 'a', toolAllow: ['sticker_send'] } as InboundServerRecord)).toEqual({ allow: ['sticker_send'] })
+  })
+})
+
+describe('manager tool allow-list round-trip', () => {
+  const base = { name: 'ws', description: 'd', version: '1.0.0' }
+  it('persists the list it created with', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, toolAllow: ['sticker_send', 'sticker_search'] })
+    expect(created.ok).toBe(true)
+    expect(rows.get(created.id!)?.toolAllow).toEqual(['sticker_send', 'sticker_search'])
+  })
+
+  it('clears the mask when the update passes an empty list', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, toolAllow: ['bash'] })
+    const updated = await manager.update(created.id!, { toolAllow: [] })
+    expect(updated.ok).toBe(true)
+    expect(rows.get(created.id!)?.toolAllow).toBeUndefined()
+  })
+
+  it('rejects an invalid name on create', async () => {
+    const { store } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, toolAllow: ['bad name'] })
+    expect(created.ok).toBe(false)
+    expect(created.message).toContain('invalid tool name')
   })
 })

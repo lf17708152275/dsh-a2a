@@ -67,6 +67,7 @@ export interface InboundServerView {
   readonly workspace?: string
   readonly provider?: string
   readonly model?: string
+  readonly toolAllow?: readonly string[]
   readonly baseUrl?: string
   readonly skills: readonly SkillView[]
 }
@@ -267,6 +268,26 @@ async function fetchModels(): Promise<ModelOption[]> {
   }
 }
 
+export interface ToolOption {
+  readonly name: string
+  readonly description?: string
+}
+
+async function fetchTools(): Promise<ToolOption[]> {
+  try {
+    const res = await fetch('/a2a/api/tools', { headers: { accept: 'application/json' } })
+    if (!res.ok) return []
+    const rows = (await res.json()) as unknown
+    if (!Array.isArray(rows)) return []
+    return rows.filter((r): r is ToolOption => {
+      const row = r as { name?: unknown; description?: unknown }
+      return typeof row.name === 'string' && row.name.length > 0
+    })
+  } catch {
+    return []
+  }
+}
+
 /** Dropdown value for "provider/id", or '' when the instance inherits the default. */
 function modelKey(provider: string | undefined, model: string | undefined): string {
   if (provider === undefined || provider === '') return ''
@@ -370,6 +391,11 @@ export function A2aSection(_props: SectionProps): ReactElement {
   const [inWorkspace, setInWorkspace] = useState('')
   const [models, setModels] = useState<readonly ModelOption[]>([])
   const [inModelKey, setInModelKey] = useState('')
+  // Per-instance tool allow-list: checked tools survive, unchecked ones leave
+  // the agent scope so their schemas stop costing context on every request.
+  const [tools, setTools] = useState<readonly ToolOption[]>([])
+  const [inToolAllow, setInToolAllow] = useState<readonly string[]>([])
+  const [toolFilter, setToolFilter] = useState('')
 
   // Deployment settings card: advertised base URL mode (inherit / auto / pick / custom).
   const [baseMode, setBaseMode] = useState<'inherit' | 'auto' | 'custom'>('inherit')
@@ -393,18 +419,20 @@ export function A2aSection(_props: SectionProps): ReactElement {
     let alive = true
     const tick = async (): Promise<void> => {
       try {
-        const [next, presetRows, modelRows] = await Promise.all([
+        const [next, presetRows, modelRows, toolRows] = await Promise.all([
           fetchSnapshot({ taskLimit, ...(taskFilter !== '' ? { taskState: taskFilter } : {}) }),
           fetchPresets(),
           fetchModels(),
+          fetchTools(),
         ])
         if (alive) {
           setSnap(next)
           setPresets(presetRows)
           setModels(modelRows)
-          // Default an unset preset picker to the deployment default (if any).
+          setTools(toolRows)
+          // Inbound presets keep '' on purpose: blank means "follow the
+          // deployment default", so do not pre-pin the default id here.
           const def = presetRows.find((p) => p.isDefault)?.id
-          setInPreset((current) => current === '' && def !== undefined ? def : current)
           setOutPreset((current) => current === '' && def !== undefined ? def : current)
           setTestInbound((current) => current === '' ? (next.inbounds[0]?.id ?? '') : current)
           setTestSkill((current) => current === '' ? (next.inbounds[0]?.skills[0]?.id ?? 'chat') : current)
@@ -539,6 +567,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInTrace(false)
     setInWorkspace('')
     setInModelKey('')
+    setInToolAllow([])
+    setToolFilter('')
   }
 
   const beginEditInbound = (v: InboundServerView): void => {
@@ -552,6 +582,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInTrace(v.trace)
     setInWorkspace(v.workspace ?? '')
     setInModelKey(modelKey(v.provider, v.model))
+    setInToolAllow(v.toolAllow ?? [])
   }
 
   const submitInbound = async (): Promise<void> => {
@@ -566,6 +597,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
       workspace: inWorkspace.trim(),
       provider: splitModelKey(inModelKey).provider,
       model: splitModelKey(inModelKey).model,
+      // Empty = keep the full tool surface; otherwise only these tools survive.
+      toolAllow: [...inToolAllow],
     }
     const done = editingIn === null
       ? await control({ action: 'inbound.create', ...base })
@@ -825,6 +858,9 @@ export function A2aSection(_props: SectionProps): ReactElement {
                                 }, missing ? `⚠ ${label}（已失效）` : label)]
                               })()
                             : []),
+                          ...(v.toolAllow !== undefined && v.toolAllow.length > 0
+                            ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'tools', title: `只保留这些工具：${v.toolAllow.join(', ')}` }, `工具 ${v.toolAllow.length}`)]
+                            : []),
                           ...(v.workspace !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'ws', title: v.workspace }, 'cwd')] : []),
                           createElement('span', { className: 'dsh-a2a-auth' }, v.authTokenEnv !== undefined ? '· 已配置鉴权' : '· 匿名'),
                         ),
@@ -914,6 +950,49 @@ export function A2aSection(_props: SectionProps): ReactElement {
                             title: pluginTitle(plugin),
                           }, pluginLabel(plugin))),
                         ),
+                  )
+                })(),
+                (() => {
+                  const keyword = toolFilter.trim().toLowerCase()
+                  const visible = tools.filter((tool) => keyword === '' || tool.name.toLowerCase().includes(keyword) || (tool.description ?? '').toLowerCase().includes(keyword))
+                  const selected = new Set(inToolAllow)
+                  const toggle = (name: string): void => {
+                    setInToolAllow((current) => current.includes(name) ? current.filter((value) => value !== name) : [...current, name])
+                  }
+                  return createElement('details', { className: 'dsh-a2a-hint', style: { flexBasis: '100%', margin: '2px 0 4px' }, open: inToolAllow.length > 0 },
+                    createElement('summary', { style: { cursor: 'pointer' } },
+                      inToolAllow.length === 0
+                        ? `工具白名单：未限制（会话可见全部 ${tools.length} 个全局工具）`
+                        : `工具白名单：只保留 ${inToolAllow.length} 个工具（其余工具连同 schema 移出上下文）${
+                          tools.length > 0 ? `，共 ${tools.length} 个可选` : ''}`),
+                    createElement('div', { className: 'dsh-a2a-hint', style: { marginTop: '4px' } },
+                      '纯对话端点一般只需要贴纸等少数工具；勾选后其余工具不再进入每轮上下文的工具区，能省 token。清空全部勾选 = 恢复全量。改动对新会话生效（老会话沿用创建时的工具集，需要的话用「换新会话」）。'),
+                    createElement('input', {
+                      className: 'dsh-a2a-input',
+                      value: toolFilter,
+                      placeholder: '搜索工具名或说明（如 sticker / web / bash）',
+                      style: { width: '100%', margin: '4px 0' },
+                      onChange: (e: { target: { value: string } }) => setToolFilter(e.target.value),
+                    }),
+                    createElement('div', { style: { maxHeight: '170px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '4px' } },
+                      ...(visible.length === 0
+                        ? [createElement('div', { className: 'dsh-a2a-hint', key: '__none' },
+                            tools.length === 0 ? '宿主没有提供工具清单（tools 服务未挂载）。' : '没有匹配的工具。')]
+                        : visible.map((tool) => createElement('label', {
+                            key: tool.name,
+                            title: tool.description ?? tool.name,
+                            style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' },
+                          },
+                            createElement('input', {
+                              type: 'checkbox',
+                              checked: selected.has(tool.name),
+                              onChange: () => toggle(tool.name),
+                            }),
+                            createElement('span', { style: { fontFamily: 'monospace' } }, tool.name),
+                            tool.description !== undefined
+                              ? createElement('span', { className: 'dsh-a2a-hint' }, `· ${tool.description}`)
+                              : null,
+                          )))),
                   )
                 })(),
                 createElement('input', {

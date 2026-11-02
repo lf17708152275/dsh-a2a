@@ -60,6 +60,12 @@ export interface ModelOptionView {
   readonly name: string
 }
 
+/** One entry of the deployment's global tool catalogue. */
+export interface ToolOptionView {
+  readonly name: string
+  readonly description?: string
+}
+
 /**
  * Deployment-wide settings as the dashboard sees them. `mode` is the effective
  * source of the advertised base URL: `inherit` (loader config), `auto`
@@ -100,6 +106,8 @@ export interface InboundServerView {
   readonly provider?: string
   /** Per-instance model id override; absent = deployment default. */
   readonly model?: string
+  /** Tool allow-list pinned to the instance; absent = the full tool surface. */
+  readonly toolAllow?: readonly string[]
   /** Per-instance advertised base URL; absent = the deployment baseUrl config. */
   readonly baseUrl?: string
   readonly skills: readonly SkillView[]
@@ -141,6 +149,8 @@ export interface InboundCreateInput {
   readonly provider?: string
   /** Model id override for this instance; absent = the deployment default. */
   readonly model?: string
+  /** Tool allow-list for this instance's sessions; absent = full tool surface. */
+  readonly toolAllow?: readonly string[]
   /** Advertised base URL for this instance's agent card; absent = the deployment default. */
   readonly baseUrl?: string
 }
@@ -188,6 +198,8 @@ export interface A2AServiceImpl {
   presets(): Promise<PresetView[]>
   /** Model catalogue the deployment can route to (empty when unknown). */
   models(): Promise<ModelOptionView[]>
+  /** Global tools a per-inbound allow-list can reference (empty when unknown). */
+  tools(): Promise<ToolOptionView[]>
   /** Why the catalogue looks the way it does; for support/debugging. */
   modelDiagnostics(): Promise<Record<string, unknown>>
   /** Deployment-wide advertised base URL settings (GUI-editable). */
@@ -199,7 +211,7 @@ export interface A2AServiceImpl {
   createInboundServer(input: InboundCreateInput): Promise<OpResult>
   removeInboundServer(id: string): Promise<OpResult>
   setInboundServerEnabled(id: string, enabled: boolean): Promise<OpResult>
-  updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; baseUrl?: string }): Promise<OpResult>
+  updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; toolAllow?: readonly string[]; baseUrl?: string }): Promise<OpResult>
   /** Set (or clear, when token is undefined) an inbound instance's bearer token. */
   setInboundAuth(id: string, token: string | undefined): Promise<OpResult>
   /** Read an inbound instance's current AgentCard (dashboard viewer). */
@@ -259,6 +271,10 @@ export class A2AService extends Service {
     return this.impl.models()
   }
 
+  async tools(): Promise<ToolOptionView[]> {
+    return this.impl.tools()
+  }
+
   async modelDiagnostics(): Promise<Record<string, unknown>> {
     return this.impl.modelDiagnostics()
   }
@@ -291,7 +307,7 @@ export class A2AService extends Service {
     return this.impl.setInboundServerEnabled(id, enabled)
   }
 
-  async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; baseUrl?: string }): Promise<OpResult> {
+  async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; toolAllow?: readonly string[]; baseUrl?: string }): Promise<OpResult> {
     return this.impl.updateInboundServer(id, patch)
   }
 

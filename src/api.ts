@@ -18,8 +18,8 @@ import type { UpdateChecker } from './update.ts'
 
 /** Control actions the dashboard can issue. */
 export type ApiAction =
-  | { readonly action: 'inbound.create'; readonly name: string; readonly description: string; readonly version: string; readonly endpointPath?: string; readonly preset?: string; readonly authTokenEnv?: string; readonly trace?: boolean; readonly enabled?: boolean; readonly workspace?: string; readonly provider?: string; readonly model?: string; readonly baseUrl?: string }
-  | { readonly action: 'inbound.remove' | 'inbound.enable' | 'inbound.disable' | 'inbound.update'; readonly id: string; readonly name?: string; readonly description?: string; readonly version?: string; readonly endpointPath?: string; readonly preset?: string; readonly authTokenEnv?: string; readonly trace?: boolean; readonly workspace?: string; readonly provider?: string; readonly model?: string; readonly baseUrl?: string }
+  | { readonly action: 'inbound.create'; readonly name: string; readonly description: string; readonly version: string; readonly endpointPath?: string; readonly preset?: string; readonly authTokenEnv?: string; readonly trace?: boolean; readonly enabled?: boolean; readonly workspace?: string; readonly provider?: string; readonly model?: string; readonly toolAllow?: readonly string[]; readonly baseUrl?: string }
+  | { readonly action: 'inbound.remove' | 'inbound.enable' | 'inbound.disable' | 'inbound.update'; readonly id: string; readonly name?: string; readonly description?: string; readonly version?: string; readonly endpointPath?: string; readonly preset?: string; readonly authTokenEnv?: string; readonly trace?: boolean; readonly workspace?: string; readonly provider?: string; readonly model?: string; readonly toolAllow?: readonly string[]; readonly baseUrl?: string }
   | { readonly action: 'inbound.setAuth'; readonly id: string; readonly token?: string }
   | { readonly action: 'inbound.sendTest'; readonly id: string; readonly text: string; readonly contextId?: string; readonly skill?: string }
   | { readonly action: 'outbound.create'; readonly name: string; readonly agentCardUrl: string; readonly bearerTokenEnv?: string; readonly preset?: string; readonly enabled?: boolean; readonly timeoutMs?: number; readonly disabledSkills?: readonly string[]; readonly skillOverrides?: Readonly<Record<string, { readonly name?: string; readonly description?: string }>> }
@@ -110,6 +110,10 @@ export async function handleApiRequest(
   }
   if (req.method === 'GET' && path === '/a2a/api/presets') {
     json(res, 200, await impl.presets())
+    return
+  }
+  if (req.method === 'GET' && path === '/a2a/api/tools') {
+    json(res, 200, await impl.tools())
     return
   }
   if (req.method === 'GET' && path === '/a2a/api/models') {
@@ -222,6 +226,7 @@ async function dispatch(payload: ApiAction, impl: A2AServiceImpl): Promise<{ rea
         ...(payload.workspace !== undefined ? { workspace: payload.workspace } : {}),
         ...(payload.provider !== undefined ? { provider: payload.provider } : {}),
         ...(payload.model !== undefined ? { model: payload.model } : {}),
+        ...(payload.toolAllow !== undefined ? { toolAllow: payload.toolAllow } : {}),
         ...(payload.baseUrl !== undefined ? { baseUrl: payload.baseUrl } : {}),
       })
     case 'inbound.remove':
@@ -242,6 +247,7 @@ async function dispatch(payload: ApiAction, impl: A2AServiceImpl): Promise<{ rea
         ...(payload.workspace !== undefined ? { workspace: payload.workspace } : {}),
         ...(payload.provider !== undefined ? { provider: payload.provider } : {}),
         ...(payload.model !== undefined ? { model: payload.model } : {}),
+        ...(payload.toolAllow !== undefined ? { toolAllow: payload.toolAllow } : {}),
         ...(payload.baseUrl !== undefined ? { baseUrl: payload.baseUrl } : {}),
       })
     case 'inbound.setAuth':
