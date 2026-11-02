@@ -123,6 +123,8 @@ export interface DeploymentSettingsView {
   readonly baseUrl?: string
   readonly effectiveBaseUrl: string
   readonly configBaseUrl?: string
+  /** Origins discovered on the host; the pick list offers them as-is. */
+  readonly candidates?: ReadonlyArray<{ readonly value: string; readonly label: string }>
 }
 
 export interface MetricsSnapshot {
@@ -328,9 +330,10 @@ export function A2aSection(_props: SectionProps): ReactElement {
   // Advertised base URL override (blank = the deployment baseUrl config).
   const [inBaseUrl, setInBaseUrl] = useState('')
 
-  // Deployment settings card: advertised base URL mode (inherit / auto / custom).
+  // Deployment settings card: advertised base URL mode (inherit / auto / pick / custom).
   const [baseMode, setBaseMode] = useState<'inherit' | 'auto' | 'custom'>('inherit')
   const [baseDraft, setBaseDraft] = useState('')
+  const [baseCandidates, setBaseCandidates] = useState<ReadonlyArray<{ readonly value: string; readonly label: string }>>([])
   const baseInit = useRef(false)
 
   // Outbound add/edit form (two-phase).
@@ -370,6 +373,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
             baseInit.current = true
             setBaseMode(settings.mode)
             setBaseDraft(settings.mode === 'custom' ? (settings.baseUrl ?? '') : '')
+            setBaseCandidates(settings.candidates ?? [])
           }
           setError(undefined)
         }
@@ -715,12 +719,26 @@ export function A2aSection(_props: SectionProps): ReactElement {
               createElement('div', { className: 'dsh-a2a-btn-row' },
                 createElement('select', {
                   className: 'dsh-a2a-input',
-                  value: baseMode,
-                  onChange: (e: { target: { value: string } }) => setBaseMode(e.target.value as 'inherit' | 'auto' | 'custom'),
+                  value: baseMode === 'custom'
+                    ? (baseCandidates.some((c) => c.value === baseDraft) ? `pick:${baseDraft}` : 'custom')
+                    : baseMode,
+                  // `pick:` marks a discovered local origin (kept as a custom
+                  // override, so the stored value stays an explicit URL).
+                  onChange: (e: { target: { value: string } }) => {
+                    const next = e.target.value
+                    if (next.startsWith('pick:')) {
+                      setBaseMode('custom')
+                      setBaseDraft(next.slice('pick:'.length))
+                      return
+                    }
+                    setBaseMode(next as 'inherit' | 'auto' | 'custom')
+                    if (next !== 'custom') setBaseDraft('')
+                  },
                 },
                   createElement('option', { value: 'inherit', key: 'inherit' }, '跟随插件配置'),
-                  createElement('option', { value: 'auto', key: 'auto' }, 'auto（按请求自动推导）'),
-                  createElement('option', { value: 'custom', key: 'custom' }, '自定义 URL'),
+                  createElement('option', { value: 'auto', key: 'auto' }, 'auto（按请求 Host 推导）'),
+                  ...baseCandidates.map((c) => createElement('option', { value: `pick:${c.value}`, key: c.value }, c.label)),
+                  createElement('option', { value: 'custom', key: 'custom' }, '自定义 URL…'),
                 ),
                 baseMode === 'custom'
                   ? createElement('input', {
@@ -732,7 +750,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                   : null,
                 createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void saveBaseSettings() } }, '保存'),
               ),
-              createElement('div', { className: 'dsh-a2a-card-sub' }, '广告地址写进 Agent Card，外部 A2A 客户端靠它回连（不含路径）。auto 按每次请求的 Host 推导。'),
+              createElement('div', { className: 'dsh-a2a-card-sub' }, '广告地址写进 Agent Card，外部 A2A 客户端靠它回连（不含路径）。下拉可选本机网卡地址、auto（按请求 Host 推导）或自定义；auto 在会改写 Host 的反向代理后面会失准，此时直接选网卡地址。'),
             ),
             createElement('div', { className: 'dsh-a2a-crew' },
               h('入站 Servers', inbounds.length),

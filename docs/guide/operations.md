@@ -70,9 +70,13 @@ the real roster and preselects the deployment default.
 At the top of the inbound tab, **Deployment settings · advertised URL** sets the
 deployment-wide advertised base URL without editing the profile config: *follow
 the plugin config*, *auto* (derive it from each request's forwarded host) or
-*custom URL*. The choice is stored in the plugin's own domain and applied
-immediately (live instances are re-assembled, no restart); per-instance
-overrides still win over it.
+one of the local origins discovered on this host (each non-internal IPv4
+interface, listed in the dropdown), falling back to *custom URL* for anything
+else. The choice is stored in the plugin's own domain and applied immediately
+(live instances are re-assembled, no restart); per-instance overrides still win
+over it. `auto` is only as good as the incoming `Host`/`X-Forwarded-Host`
+header: behind a reverse proxy that rewrites `Host` (and does not forward the
+original one), pick the LAN origin explicitly.
 
 The test console selects an instance, a skill, an optional `contextId` and a
 message, then shows the resulting task JSON.

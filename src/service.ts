@@ -5,6 +5,7 @@
  * @module dsh-a2a/service
  */
 
+import type { BaseUrlCandidate } from './server/net.ts'
 import { Service, type Context } from '@deepseek-ai/cordis'
 import type { SessionView } from './server/session-registry.ts'
 
@@ -52,6 +53,8 @@ export interface DeploymentSettingsView {
   readonly effectiveBaseUrl: string
   /** Loader-level `baseUrl` config, when the deployment sets one. */
   readonly configBaseUrl?: string
+  /** Origins discovered on this host (pick-list entries for the dashboard). */
+  readonly candidates: readonly BaseUrlCandidate[]
 }
 
 /** One inbound server instance, as the GUI/facade reads it. */

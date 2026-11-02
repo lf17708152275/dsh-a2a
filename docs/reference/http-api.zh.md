@@ -163,7 +163,8 @@ profile 配置），并立即重建所有存活入站实例。`baseUrl` 接受 `
 当前模式也会出现在 `GET /a2a/api` 快照的 `settings` 字段里：`mode` 为
 `inherit`（跟随插件配置）、`auto`（按请求推导）或 `custom`（固定 URL），
 `baseUrl` 是已存的覆盖值（如有），`effectiveBaseUrl` 是此刻卡片广告的地址，
-`configBaseUrl` 是 loader 配置值（如有）。
+`configBaseUrl` 是 loader 配置值（如有），`candidates` 列出本机所有非回环 IPv4
+网卡地址（`http://<ipv4>`），方便 dashboard 做成下拉选项而不必手输。
 
 #### 出站
 

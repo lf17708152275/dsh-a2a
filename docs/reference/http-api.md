@@ -179,6 +179,9 @@ The current mode is mirrored in the `GET /a2a/api` snapshot under `settings`:
 `mode` is `inherit` (loader config), `auto` (per request) or `custom` (pinned),
 `baseUrl` is the stored override when there is one, `effectiveBaseUrl` is what
 cards advertise right now, and `configBaseUrl` is the loader value when set.
+`candidates` lists the host's own origins (`http://<ipv4>` per non-internal
+interface) so a dashboard can offer them as a pick list instead of asking the
+operator to type an address.
 
 #### Outbound
 

@@ -38,6 +38,7 @@ import { A2AService, type A2AServiceImpl, type DeploymentSettingsView, type Inbo
 import { buildA2aCommand } from './commands.ts'
 import { InboundServerManager, DomainInboundStore, resolveAuthToken, validateBaseUrl, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
 import { readDeploymentSettings, writeDeploymentSettings, type DeploymentSettingsRecord } from './server/settings.ts'
+import { discoverBaseUrlCandidates } from './server/net.ts'
 import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, type OutboundServerView } from './servers/outbound-manager.ts'
 
 export const name = 'a2a'
@@ -358,6 +359,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
         ...(storedBaseUrl !== undefined ? { baseUrl: storedBaseUrl } : {}),
         effectiveBaseUrl: hostBaseUrl() ?? '',
         ...(host.configBaseUrl !== undefined ? { configBaseUrl: host.configBaseUrl } : {}),
+        candidates: discoverBaseUrlCandidates(),
       }
     },
     async updateSettings(patch: { readonly baseUrl?: string }): Promise<OpResult> {
