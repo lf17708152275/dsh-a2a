@@ -39,6 +39,7 @@ import { buildA2aCommand } from './commands.ts'
 import { InboundServerManager, DomainInboundStore, resolveAuthToken, validateBaseUrl, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
 import { readDeploymentSettings, writeDeploymentSettings, type DeploymentSettingsRecord } from './server/settings.ts'
 import { discoverBaseUrlCandidates } from './server/net.ts'
+import { registerDefaultWorkspace, type WorkspaceCreatorLike } from './server/default-workspace.ts'
 import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, type OutboundServerView } from './servers/outbound-manager.ts'
 
 export const name = 'a2a'
@@ -131,6 +132,19 @@ export function apply(ctx: Context, config: A2AConfig) {
         await registry.unarchiveSession(sessionId)
         logger.info(`[a2a] revived archived session ${sessionId}`)
       }
+      // Inbounds without their own workspace run in `inboundCwd`; the host
+      // only lists sessions whose cwd is a registered workspace, so own that
+      // directory. Idempotent — the host reuses an existing record — hence it
+      // runs once per start and again whenever an inbound is saved blank.
+      const ensureInboundWorkspace = (): Promise<boolean> =>
+        registerDefaultWorkspace(
+          probeService(ctx, 'workspaceRegistry', 'create') as WorkspaceCreatorLike | undefined,
+          inboundCwd,
+          {
+            onRegistered: (dir) => logger.info(`[a2a] default inbound workspace registered: ${dir}`),
+            onError: (dir, error) => logger.warn(`[a2a] default inbound workspace registration failed for ${dir}: ${(error as Error).message}`),
+          },
+        )
       // GUI-editable deployment overrides live in the `a2a` domain and win over
       // the loader config; an absent value inherits the config, then loopback.
       let deploymentSettings = readDeploymentSettings(domain)
@@ -164,6 +178,9 @@ export function apply(ctx: Context, config: A2AConfig) {
       }
       const inboundManager = new InboundServerManager(inboundHost, new DomainInboundStore(domain.inbound_servers))
       await inboundManager.boot()
+      // Best effort: the workspace registry may mount after this plugin, and
+      // every blank-workspace inbound save retries the registration anyway.
+      void ensureInboundWorkspace()
 
       // ── outbound manager ──────────────────────────────────────────────
       const outboundHost: OutboundManagerHost = {
@@ -197,6 +214,7 @@ export function apply(ctx: Context, config: A2AConfig) {
         defaultBaseUrl: effectiveBaseUrl,
         ...(config.baseUrl !== undefined ? { configBaseUrl: config.baseUrl } : {}),
         deploymentSettings: () => deploymentSettings,
+        ensureInboundWorkspace,
         updateDeploymentSettings: async (patch) => {
           const current: DeploymentSettingsRecord = deploymentSettings ?? {}
           const raw = patch.baseUrl ?? ''
@@ -266,6 +284,8 @@ interface FacadeHost {
   readonly deploymentSettings?: (() => DeploymentSettingsRecord | undefined) | undefined
   /** Persist new deployment settings and re-assemble live instances. */
   readonly updateDeploymentSettings?: ((patch: { readonly baseUrl?: string }) => Promise<OpResult>) | undefined
+  /** Own the default inbound session directory as a host workspace. */
+  readonly ensureInboundWorkspace?: (() => Promise<boolean>) | undefined
 }
 
 /** Facade closure over the two managers (commands and `ctx.a2a` consumers). */
@@ -404,6 +424,9 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       return host.inboundManager.list().map((live) => inboundView(live.id)).filter((v): v is InboundServerView => v !== undefined)
     },
     async createInboundServer(input: InboundCreateInput): Promise<OpResult> {
+      // A blank workspace means "the deployment default"; make that default
+      // visible in the host session list before the first session lands in it.
+      if (input.workspace === undefined || input.workspace.trim().length === 0) await host.ensureInboundWorkspace?.()
       const result = await host.inboundManager.add({
         name: input.name,
         description: input.description,
@@ -433,6 +456,9 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       return result
     },
     async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string; baseUrl?: string }): Promise<OpResult> {
+      // Clearing the override returns the endpoint to the deployment default;
+      // re-own it so its sessions stay listed.
+      if (patch.workspace !== undefined && patch.workspace.trim().length === 0) await host.ensureInboundWorkspace?.()
       const result = await host.inboundManager.update(id, patch)
       audit('inbound.update', result.message, id)
       return result

@@ -135,9 +135,12 @@ host exports `DSH_PROFILE`. When no source answers, the endpoint still returns
 `workspace` pins one inbound instance to a local working directory: it must be
 an absolute path to an existing directory, and it is used as the `cwd` for every
 agent session the instance opens. Omitted (or empty) means "inherit the
-deployment working directory". The value only applies when a session is
-created — contexts that already exist keep the `cwd` they were opened with, so
-switch the context id if you change it.
+deployment working directory": the plugin then owns
+`<DSH_HOME or ~/.dsh>/a2a-sessions` as a host workspace, so the host lists those
+sessions instead of hiding them (registered once per plugin start and again on
+every save that leaves the field blank). The value only applies when a session
+is created — contexts that already exist keep the `cwd` they were opened with,
+so switch the context id if you change it.
 
 `provider` / `model` pin one inbound instance to a specific model selection,
 overriding the deployment default for that instance only. Both fields are

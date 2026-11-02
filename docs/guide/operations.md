@@ -58,7 +58,9 @@ chips and the live card URL. Actions:
 
 The create/edit form has name, version, preset, workspace, advertised base URL,
 provider, model, bearer token and description. `workspace` (absolute path to an
-existing directory) pins that instance's agent sessions to a local project;
+existing directory) pins that instance's agent sessions to a local project —
+leave it empty and the plugin owns `~/.dsh/a2a-sessions` as a host workspace so
+those sessions stay visible in the host session list;
 `provider` and `model` pin its model selection; the advertised base URL changes
 the address written into this instance's agent card so external A2A clients call
 back through a reachable host (type `auto` to derive it from each request's
