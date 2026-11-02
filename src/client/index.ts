@@ -361,6 +361,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
   const [inDesc, setInDesc] = useState('')
   const [inVersion, setInVersion] = useState('1.0.0')
   const [inPreset, setInPreset] = useState('')
+  // Capability filter: narrow the preset picker by the plugins a preset mounts.
+  const [presetFilter, setPresetFilter] = useState('')
   const [inToken, setInToken] = useState('')
   const [inClearAuth, setInClearAuth] = useState(false)
   const [inTrace, setInTrace] = useState(false)
@@ -531,6 +533,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInDesc('')
     setInVersion('1.0.0')
     setInPreset('')
+    setPresetFilter('')
     setInToken('')
     setInClearAuth(false)
     setInTrace(false)
@@ -818,6 +821,22 @@ export function A2aSection(_props: SectionProps): ReactElement {
                         v.workspace !== undefined
                           ? createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `cwd: ${v.workspace}`)
                           : null,
+                        (() => {
+                          const preset = presets.find((p) => p.id === v.preset)
+                          const plugins = (preset?.plugins ?? []).filter((plugin) => plugin.enabled !== false)
+                          if (plugins.length === 0) return null
+                          const shown = plugins.slice(0, 6)
+                          return createElement('div', { style: { marginTop: '2px' } },
+                            ...shown.map((plugin, i) => createElement('span', {
+                              className: 'dsh-a2a-skill',
+                              key: `${plugin.module}:${plugin.entryId ?? i}`,
+                              title: pluginTitle(plugin),
+                            }, plugin.label ?? plugin.module)),
+                            plugins.length > shown.length
+                              ? createElement('span', { className: 'dsh-a2a-skill', key: '__more', title: plugins.slice(shown.length).map((p) => p.label ?? p.module).join('、') }, `+${plugins.length - shown.length}`)
+                              : null,
+                          )
+                        })(),
                         v.skills.length > 0
                           ? createElement('div', null, ...v.skills.map((s) => createElement('span', { className: 'dsh-a2a-skill', key: s.id, title: s.description ?? '' }, s.name)))
                           : null,
@@ -837,10 +856,34 @@ export function A2aSection(_props: SectionProps): ReactElement {
               createElement('form', { className: 'dsh-a2a-form', onSubmit: (ev: { preventDefault(): void }) => { ev.preventDefault(); void submitInbound() } },
                 createElement('input', { className: 'dsh-a2a-input', value: inName, placeholder: '名称', onChange: (e: { target: { value: string } }) => setInName(e.target.value) }),
                 createElement('input', { className: 'dsh-a2a-input', value: inVersion, placeholder: '版本', style: { width: '76px' }, onChange: (e: { target: { value: string } }) => setInVersion(e.target.value) }),
-                createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value), title: '绑定这个端点使用的 Agent 预设；选「默认」= 跟随部署默认预设' },
-                  createElement('option', { value: '', key: '__default__' }, '（默认：跟随部署）'),
-                  ...presets.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, `${p.name ?? p.id}（${mountedPluginCount(p)} 项能力）`)),
-                ),
+                createElement('input', {
+                  className: 'dsh-a2a-input',
+                  value: presetFilter,
+                  placeholder: '按能力筛选预设（如 终端 / 表情 / 子代理）',
+                  title: '按插件中文名或模块名过滤上面的预设清单，方便按能力挑预设',
+                  style: { width: '240px' },
+                  onChange: (e: { target: { value: string } }) => setPresetFilter(e.target.value),
+                }),
+                (() => {
+                  const keyword = presetFilter.trim().toLowerCase()
+                  const matches = (preset: PresetView): boolean => {
+                    if (keyword === '') return true
+                    const haystack = [
+                      preset.id,
+                      preset.name ?? '',
+                      preset.description ?? '',
+                      ...(preset.plugins ?? []).flatMap((plugin) => [plugin.label ?? '', plugin.module]),
+                    ].join(' ').toLowerCase()
+                    return haystack.includes(keyword)
+                  }
+                  const visible = presets.filter(matches)
+                  const current = presets.find((preset) => preset.id === inPreset)
+                  const candidates = current !== undefined && !visible.includes(current) ? [...visible, current] : visible
+                  return createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value), title: '绑定这个端点使用的 Agent 预设；选「默认」= 跟随部署默认预设' },
+                    createElement('option', { value: '', key: '__default__' }, '（默认：跟随部署）'),
+                    ...candidates.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, `${p.name ?? p.id}（${mountedPluginCount(p)} 项能力）`)),
+                  )
+                })(),
                 (() => {
                   const activePreset = presets.find((p) => p.id === inPreset) ?? presets.find((p) => p.isDefault === true)
                   if (activePreset === undefined) return null
