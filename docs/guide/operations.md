@@ -71,7 +71,9 @@ plugins that preset mounts, and expanding the **capabilities** line under the
 picker lists the plugin rows themselves (friendly name, module, `enabled` /
 `disabled` / `conditional:<expr>`), so you can see exactly what an A2A session from this
 endpoint will carry before creating it. The same count appears as a badge on the
-instance card.
+instance card. The list shows the rows the preset itself declares; a live session
+also inherits deployment-level plugins (stickers, team/subagent tools), so treat
+the DSH session plugin view as the full runtime picture.
 
 At the top of the inbound tab, **Deployment settings · advertised URL** sets the
 deployment-wide advertised base URL without editing the profile config: *follow

@@ -892,6 +892,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
                     createElement('summary', { style: { cursor: 'pointer' } },
                       `该预设的 A2A 会话会携带 ${mountedPluginCount(activePreset)} 个插件${plugins.length > mountedPluginCount(activePreset) ? `（声明 ${plugins.length} 行）` : ''} · ${activePreset.name ?? activePreset.id}`,
                     ),
+                    createElement('div', { className: 'dsh-a2a-hint', style: { marginTop: '4px' } },
+                      '这里是预设自己声明挂载的插件；实际会话还会叠加部署级插件（例如贴纸、团队工具），完整运行时清单以 DSH 会话页的插件视图为准。'),
                     plugins.length === 0
                       ? createElement('div', { className: 'dsh-a2a-hint' }, '宿主没有提供这个预设的插件清单（预设仍可用，只是不能在这里预读）。')
                       : createElement('div', { style: { marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' } },
