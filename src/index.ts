@@ -39,7 +39,7 @@ import { buildA2aCommand } from './commands.ts'
 import { InboundServerManager, DomainInboundStore, resolveAuthToken, validateBaseUrl, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
 import { readDeploymentSettings, writeDeploymentSettings, type DeploymentSettingsRecord } from './server/settings.ts'
 import { discoverBaseUrlCandidates } from './server/net.ts'
-import { registerDefaultWorkspace, type WorkspaceCreatorLike } from './server/default-workspace.ts'
+import { registerDefaultWorkspace, type WorkspaceCreatorLike, type WorkspaceRegistrationStatus } from './server/default-workspace.ts'
 import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, type OutboundServerView } from './servers/outbound-manager.ts'
 
 export const name = 'a2a'
@@ -136,7 +136,7 @@ export function apply(ctx: Context, config: A2AConfig) {
       // only lists sessions whose cwd is a registered workspace, so own that
       // directory. Idempotent — the host reuses an existing record — hence it
       // runs once per start and again whenever an inbound is saved blank.
-      const ensureInboundWorkspace = (): Promise<boolean> =>
+      const ensureInboundWorkspace = (): Promise<WorkspaceRegistrationStatus> =>
         registerDefaultWorkspace(
           probeService(ctx, 'workspaceRegistry', 'create') as WorkspaceCreatorLike | undefined,
           inboundCwd,
@@ -178,9 +178,23 @@ export function apply(ctx: Context, config: A2AConfig) {
       }
       const inboundManager = new InboundServerManager(inboundHost, new DomainInboundStore(domain.inbound_servers))
       await inboundManager.boot()
-      // Best effort: the workspace registry may mount after this plugin, and
-      // every blank-workspace inbound save retries the registration anyway.
-      void ensureInboundWorkspace()
+      // The workspace registry may mount after this plugin, so a single
+      // startup probe can miss it: retry briefly, and let every
+      // blank-workspace inbound save retry as well.
+      let workspaceRegTimer: ReturnType<typeof setTimeout> | undefined
+      let workspaceRegAttempts = 0
+      const attemptWorkspaceRegistration = async (): Promise<void> => {
+        workspaceRegAttempts += 1
+        const status = await ensureInboundWorkspace()
+        // A host rejection is already logged and will not fix itself.
+        if (status !== 'unavailable') return
+        if (workspaceRegAttempts >= WORKSPACE_REGISTRATION_ATTEMPTS) {
+          logger.warn('[a2a] workspace registry stayed unavailable; default inbound sessions are not listed')
+          return
+        }
+        workspaceRegTimer = setTimeout(() => void attemptWorkspaceRegistration(), 500)
+      }
+      void attemptWorkspaceRegistration()
 
       // ── outbound manager ──────────────────────────────────────────────
       const outboundHost: OutboundManagerHost = {
@@ -256,6 +270,7 @@ export function apply(ctx: Context, config: A2AConfig) {
       }
 
       return async () => {
+        if (workspaceRegTimer !== undefined) clearTimeout(workspaceRegTimer)
         inboundManager.disposeAll()
         await outboundManager.disposeAll()
         await domain.close()
@@ -285,7 +300,7 @@ interface FacadeHost {
   /** Persist new deployment settings and re-assemble live instances. */
   readonly updateDeploymentSettings?: ((patch: { readonly baseUrl?: string }) => Promise<OpResult>) | undefined
   /** Own the default inbound session directory as a host workspace. */
-  readonly ensureInboundWorkspace?: (() => Promise<boolean>) | undefined
+  readonly ensureInboundWorkspace?: (() => Promise<WorkspaceRegistrationStatus>) | undefined
 }
 
 /** Facade closure over the two managers (commands and `ctx.a2a` consumers). */
@@ -691,6 +706,9 @@ function inboundSessionCwd(): string {
   }
   return dir
 }
+
+/** Startup retry budget for the default workspace registration (500ms each). */
+const WORKSPACE_REGISTRATION_ATTEMPTS = 40
 
 function noopRegister(): () => void {
   return () => {}

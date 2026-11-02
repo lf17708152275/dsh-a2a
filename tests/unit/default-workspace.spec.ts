@@ -37,7 +37,7 @@ describe('default inbound workspace registration', () => {
     const ok = await registerDefaultWorkspace(registry, '/home/u/.dsh/a2a-sessions', {
       onRegistered: (path) => registered.push(path),
     })
-    expect(ok).toBe(true)
+    expect(ok).toBe('registered')
     expect(calls).toEqual([{ path: '/home/u/.dsh/a2a-sessions', title: DEFAULT_INBOUND_WORKSPACE_TITLE }])
     expect(registered).toEqual(['/home/u/.dsh/a2a-sessions'])
   })
@@ -50,14 +50,14 @@ describe('default inbound workspace registration', () => {
 
   it('treats a reused record as a success', async () => {
     const { registry } = fakeRegistry(undefined)
-    await expect(registerDefaultWorkspace(registry, '/tmp/sessions')).resolves.toBe(true)
+    await expect(registerDefaultWorkspace(registry, '/tmp/sessions')).resolves.toBe('registered')
   })
 
   it('does nothing without a workspace registry', async () => {
     const onRegistered = vi.fn()
     const onError = vi.fn()
     const ok = await registerDefaultWorkspace(undefined, '/tmp/sessions', { onRegistered, onError })
-    expect(ok).toBe(false)
+    expect(ok).toBe('unavailable')
     expect(onRegistered).not.toHaveBeenCalled()
     expect(onError).not.toHaveBeenCalled()
   })
@@ -75,7 +75,7 @@ describe('default inbound workspace registration', () => {
       onRegistered,
       onError: (_path, error) => errors.push(error),
     })
-    expect(ok).toBe(false)
+    expect(ok).toBe('failed')
     expect(onRegistered).not.toHaveBeenCalled()
     expect(errors).toEqual([failure])
   })

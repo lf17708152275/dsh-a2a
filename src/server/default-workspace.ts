@@ -20,6 +20,15 @@ export interface WorkspaceCreatorLike {
 /** Display title used when the default inbound workspace is first created. */
 export const DEFAULT_INBOUND_WORKSPACE_TITLE = 'A2A Sessions'
 
+/** Outcome of one registration attempt. */
+export type WorkspaceRegistrationStatus =
+  /** The host now holds the directory (new record or an existing one). */
+  | 'registered'
+  /** No workspace registry in this composition; nothing to do. */
+  | 'unavailable'
+  /** The host rejected the directory; the cause was reported to `onError`. */
+  | 'failed'
+
 /** Observers around one registration attempt; both are optional. */
 export interface RegisterDefaultWorkspaceOptions {
   /** Display title for a newly created record (defaults to the module title). */
@@ -40,20 +49,20 @@ export interface RegisterDefaultWorkspaceOptions {
  * @param registry - the probed workspace registry, or undefined when absent.
  * @param directory - absolute directory the default inbound sessions run in.
  * @param options - optional title and observers.
- * @returns whether the host holds the directory as a workspace now.
+ * @returns `registered`, `unavailable`, or `failed` (see the status type).
  */
 export async function registerDefaultWorkspace(
   registry: WorkspaceCreatorLike | undefined,
   directory: string,
   options: RegisterDefaultWorkspaceOptions = {},
-): Promise<boolean> {
-  if (registry === undefined) return false
+): Promise<WorkspaceRegistrationStatus> {
+  if (registry === undefined) return 'unavailable'
   try {
     await registry.create(directory, options.title ?? DEFAULT_INBOUND_WORKSPACE_TITLE)
     options.onRegistered?.(directory)
-    return true
+    return 'registered'
   } catch (error) {
     options.onError?.(directory, error)
-    return false
+    return 'failed'
   }
 }
