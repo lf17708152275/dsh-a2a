@@ -79,6 +79,13 @@ export interface InboundManagerHost {
   readonly defaultPresetId?: string
   /** Resolve the deployment's default model options (may be undefined). */
   readonly resolveDefaultModel?: () => { readonly provider?: string; readonly model?: string } | undefined
+  /**
+   * Lift the host's archive flag for a session this instance is about to drive.
+   * An archived session rejects every step (the host gate ends the turn
+   * `blocked`), producing a reply with no visible output — inbound traffic is
+   * explicit activity, so the session is revived instead.
+   */
+  readonly reviveArchivedSession?: (sessionId: string) => void | Promise<void>
   /** Allocate a fresh stable instance id. */
   readonly newId: () => string
 }
@@ -373,6 +380,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
         .catch((err: unknown) => {
           host.logger.error(`[a2a:${record.id}] context binding persist failed: ${String(err)}`)
         }),
+      ...(host.reviveArchivedSession !== undefined ? { reviveArchivedSession: host.reviveArchivedSession } : {}),
     })
     : undefined
   const sessionExecutor = sessionPool ? createSessionExecutor(sessionPool) : refuseExecutor('no agent loop mounted')

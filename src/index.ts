@@ -43,6 +43,12 @@ import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, t
 
 export const name = 'a2a'
 
+/** Structural slice of `ctx.workspaceRegistry` used to lift stale archive flags. */
+interface WorkspaceRegistryLike {
+  readonly archivedSessionIds?: readonly unknown[]
+  unarchiveSession(sessionId: string): Promise<unknown>
+}
+
 /** Only the storage domain is required; the other halves are probed. */
 export const inject = ['storageDomain'] as const
 
@@ -114,6 +120,17 @@ export function apply(ctx: Context, config: A2AConfig) {
         | undefined
 
       const loopbackBaseUrl = (): string => `http://127.0.0.1:${webServerPort(webServer) ?? process.env['DSH_A2A_PORT'] ?? '3000'}`
+      // A host that archived one of our sessions (session-list cleanup) rejects
+      // every step it is woken for, so the turn ends `blocked` with no assistant
+      // text. Probe lazily: the registry may mount after this plugin.
+      const reviveArchivedSession = async (sessionId: string): Promise<void> => {
+        const registry = probeService(ctx, 'workspaceRegistry', 'unarchiveSession') as WorkspaceRegistryLike | undefined
+        if (registry === undefined) return
+        const archived = registry.archivedSessionIds ?? []
+        if (!archived.some((id) => String(id) === sessionId)) return
+        await registry.unarchiveSession(sessionId)
+        logger.info(`[a2a] revived archived session ${sessionId}`)
+      }
       // GUI-editable deployment overrides live in the `a2a` domain and win over
       // the loader config; an absent value inherits the config, then loopback.
       let deploymentSettings = readDeploymentSettings(domain)
@@ -138,6 +155,7 @@ export function apply(ctx: Context, config: A2AConfig) {
         maxBodyBytes: config.maxBodyBytes,
         ...(agentPresets?.defaultId !== undefined ? { defaultPresetId: agentPresets.defaultId } : {}),
         resolveDefaultModel: () => resolveDefaultModel(ctx),
+        reviveArchivedSession,
         sessionCwd: inboundCwd,
         defaultBaseUrl: effectiveBaseUrl,
         subagentProvider,

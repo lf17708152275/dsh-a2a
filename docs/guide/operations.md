@@ -128,6 +128,10 @@ Semantics:
 - **Close** additionally releases the context's live session handle. It is a
   resource release, not a conversation tombstone: the next task on the same
   context opens a fresh handle.
+- **Archived sessions** are revived on the next inbound task: the host's
+  archived-session gate rejects every step of an archived session (the turn
+  ends `blocked` with no assistant text), so the instance lifts the archive flag
+  before the turn runs.
 - **Close** on a peer cancels its active tasks and drops its registry entry; it
   does not delete task records.
 

@@ -156,6 +156,13 @@ export interface AgentRuntimeOptions {
   readonly sessionNamespace?: string
   /** Once-per-context hook after the first prompt lands (cosmetic naming). */
   readonly onSessionOpened?: (info: { readonly sessionId: string; readonly contextId: string; readonly firstPrompt: string }) => void | Promise<void>
+  /**
+   * Lift a stale archive flag before the first turn of an opened session.
+   * DSH's archived-session gate rejects every proposed step, so an archived
+   * session completes a turn with no assistant text at all; an inbound task is
+   * explicit activity, so the host revives the session instead of failing.
+   */
+  readonly reviveArchivedSession?: (sessionId: string) => void | Promise<void>
 }
 
 /** An error raised when a turn is canceled by its caller. */
@@ -238,16 +245,26 @@ export class ContextSessionPool {
       ...withModel,
       ...(setup ? { setup } : {}),
     }
+    let handle: AgentHandle
     try {
-      return await this.agents.create(createOptions)
+      handle = await this.agents.create(createOptions)
     } catch (err) {
       // DSH raises `session "x" already exists` / `... is already owned by an
       // active write handle`; both must resume, not fail the task.
       if (/already (has|owns|exists|owned)|persisted/i.test((err as Error).message)) {
-        return await this.agents.resume({ resumeSessionId: sessionId, ...withModel, ...(setup ? { setup } : {}) })
+        handle = await this.agents.resume({ resumeSessionId: sessionId, ...withModel, ...(setup ? { setup } : {}) })
+      } else {
+        throw err
       }
-      throw err
     }
+    // Best effort: an archived session rejects every step (turn ends blocked
+    // with no assistant text), so revive it before the first turn runs.
+    try {
+      await this.opts.reviveArchivedSession?.(sessionId)
+    } catch {
+      // Revival is an optimization; a failed unarchive must not fail the task.
+    }
+    return handle
   }
 
   /** True while this pool holds a live handle for the context. */

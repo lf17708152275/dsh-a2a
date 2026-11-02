@@ -96,6 +96,29 @@ describe('ContextSessionPool session lifecycle', () => {
       { sessionId: 'a2a-ctx-1', contextId: 'ctx-1', firstPrompt: 'after-close' },
     ])
   })
+
+  it('revives the session once per open before its first turn', async () => {
+    const revived: string[] = []
+    const agents = fakeAgents()
+    const pool = new ContextSessionPool(agents as unknown as AgentRegistryLike, {
+      cwd: '/tmp',
+      reviveArchivedSession: (sessionId) => { revived.push(sessionId) },
+    })
+    await pool.runTurn('ctx-arch', 'hello', new AbortController().signal)
+    // A live handle is not re-opened, so the revival happens exactly once.
+    await pool.runTurn('ctx-arch', 'again', new AbortController().signal)
+    expect(revived).toEqual(['a2a-ctx-arch'])
+  })
+
+  it('a failing revival never fails the turn', async () => {
+    const agents = fakeAgents()
+    const pool = new ContextSessionPool(agents as unknown as AgentRegistryLike, {
+      cwd: '/tmp',
+      reviveArchivedSession: async () => { throw new Error('registry unavailable') },
+    })
+    await expect(pool.runTurn('ctx-arch', 'hello', new AbortController().signal)).resolves.toBe('')
+    expect(agents.sent).toHaveLength(1)
+  })
 })
 describe('ContextSessionPool concurrency and content', () => {
   it('opens one session for concurrent agentFor calls', async () => {
