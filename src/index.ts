@@ -34,9 +34,10 @@ import { isTerminal, Role } from './protocol.ts'
 import type { SubagentsLike } from './server/exec/subagent.ts'
 import { handleApiRequest } from './api.ts'
 import { createUpdateChecker } from './update.ts'
-import { A2AService, type A2AServiceImpl, type InboundCreateInput, type InboundServerView, type OutboundCreateInput, type OpResult, type PresetView, type SkillView, type TaskListPage, type TaskListQuery } from './service.ts'
+import { A2AService, type A2AServiceImpl, type DeploymentSettingsView, type InboundCreateInput, type InboundServerView, type OutboundCreateInput, type OpResult, type PresetView, type SkillView, type TaskListPage, type TaskListQuery } from './service.ts'
 import { buildA2aCommand } from './commands.ts'
-import { InboundServerManager, DomainInboundStore, resolveAuthToken, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
+import { InboundServerManager, DomainInboundStore, resolveAuthToken, validateBaseUrl, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
+import { readDeploymentSettings, writeDeploymentSettings, type DeploymentSettingsRecord } from './server/settings.ts'
 import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, type OutboundServerView } from './servers/outbound-manager.ts'
 
 export const name = 'a2a'
@@ -111,7 +112,11 @@ export function apply(ctx: Context, config: A2AConfig) {
         | { register(def: { name: string; description: string; handler(...args: unknown[]): unknown }): () => void }
         | undefined
 
-      const baseUrl = config.baseUrl ?? `http://127.0.0.1:${webServerPort(webServer) ?? process.env['DSH_A2A_PORT'] ?? '3000'}`
+      const loopbackBaseUrl = (): string => `http://127.0.0.1:${webServerPort(webServer) ?? process.env['DSH_A2A_PORT'] ?? '3000'}`
+      // GUI-editable deployment overrides live in the `a2a` domain and win over
+      // the loader config; an absent value inherits the config, then loopback.
+      let deploymentSettings = readDeploymentSettings(domain)
+      const effectiveBaseUrl = (): string => deploymentSettings?.baseUrl ?? config.baseUrl ?? loopbackBaseUrl()
 
       // ── inbound manager ───────────────────────────────────────────────
       const inboundHost: InboundManagerHost = {
@@ -133,7 +138,7 @@ export function apply(ctx: Context, config: A2AConfig) {
         ...(agentPresets?.defaultId !== undefined ? { defaultPresetId: agentPresets.defaultId } : {}),
         resolveDefaultModel: () => resolveDefaultModel(ctx),
         sessionCwd: inboundCwd,
-        defaultBaseUrl: baseUrl,
+        defaultBaseUrl: effectiveBaseUrl,
         subagentProvider,
         inboundTrace: config.inboundTrace,
         newId: () => crypto.randomUUID().slice(0, 8),
@@ -170,7 +175,32 @@ export function apply(ctx: Context, config: A2AConfig) {
         logger: logger.info.bind(logger),
         listModels: () => listAvailableModels(ctx),
         modelDiagnostics: async () => (await probeModelCatalogue(ctx)).diagnostics,
-        ...(baseUrl !== undefined ? { defaultBaseUrl: baseUrl } : {}),
+        defaultBaseUrl: effectiveBaseUrl,
+        ...(config.baseUrl !== undefined ? { configBaseUrl: config.baseUrl } : {}),
+        deploymentSettings: () => deploymentSettings,
+        updateDeploymentSettings: async (patch) => {
+          const current: DeploymentSettingsRecord = deploymentSettings ?? {}
+          const raw = patch.baseUrl ?? ''
+          let next: DeploymentSettingsRecord
+          if (raw.trim().length === 0) {
+            // Blank clears the override so the loader config applies again.
+            const { baseUrl: _cleared, ...rest } = current
+            next = rest
+          } else {
+            const checked = validateBaseUrl(raw)
+            if (!checked.ok) return { ok: false, message: checked.message }
+            next = { ...current, ...(checked.value !== undefined ? { baseUrl: checked.value } : {}) }
+          }
+          try {
+            await writeDeploymentSettings(domain, next)
+          } catch (err) {
+            return { ok: false, message: `failed to persist settings: ${String(err)}` }
+          }
+          deploymentSettings = next
+          // Re-assemble every live instance so a mode switch takes effect now.
+          for (const live of inboundManager.list()) await inboundManager.update(live.id, {})
+          return { ok: true, message: `advertised base URL: ${next.baseUrl ?? 'inherit (plugin config)'}` }
+        },
       })
       new A2AService(ctx, impl)
 
@@ -210,16 +240,29 @@ interface FacadeHost {
   /** Diagnostics for the catalogue probe, surfaced by `?debug=1`. */
   readonly modelDiagnostics?: (() => Promise<Record<string, unknown>>) | undefined
   /** Deployment advertised base URL; `auto` means request-derived per instance. */
-  readonly defaultBaseUrl?: string | undefined
+  readonly defaultBaseUrl?: string | (() => string) | undefined
+  /** Loader-level `baseUrl` config, shown as the inherit target in the GUI. */
+  readonly configBaseUrl?: string | undefined
+  /** GUI-editable deployment overrides (a getter so edits show immediately). */
+  readonly deploymentSettings?: (() => DeploymentSettingsRecord | undefined) | undefined
+  /** Persist new deployment settings and re-assemble live instances. */
+  readonly updateDeploymentSettings?: ((patch: { readonly baseUrl?: string }) => Promise<OpResult>) | undefined
 }
 
 /** Facade closure over the two managers (commands and `ctx.a2a` consumers). */
 function makeFacade(host: FacadeHost): A2AServiceImpl {
+  /** Current deployment default base URL (`auto` or a concrete origin). */
+  const hostBaseUrl = (): string | undefined => {
+    const source = host.defaultBaseUrl
+    if (source === undefined) return undefined
+    return typeof source === 'function' ? source() : source
+  }
+
   const inboundView = (id: string): InboundServerView | undefined => {
     const live = host.inboundManager.get(id)
     if (live === undefined) return undefined
     const r = live.record
-    const effectiveBaseUrl = r.baseUrl ?? host.defaultBaseUrl
+    const effectiveBaseUrl = r.baseUrl ?? hostBaseUrl()
     const autoBaseUrl = effectiveBaseUrl === 'auto'
     return {
       id: r.id,
@@ -306,6 +349,21 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       } catch (err) {
         return { reason: `diagnostics threw: ${(err as Error).message}` }
       }
+    },
+    settings(): DeploymentSettingsView {
+      const storedBaseUrl = host.deploymentSettings?.()?.baseUrl
+      const mode: DeploymentSettingsView['mode'] = storedBaseUrl === 'auto' ? 'auto' : storedBaseUrl !== undefined ? 'custom' : 'inherit'
+      return {
+        mode,
+        ...(storedBaseUrl !== undefined ? { baseUrl: storedBaseUrl } : {}),
+        effectiveBaseUrl: hostBaseUrl() ?? '',
+        ...(host.configBaseUrl !== undefined ? { configBaseUrl: host.configBaseUrl } : {}),
+      }
+    },
+    async updateSettings(patch: { readonly baseUrl?: string }): Promise<OpResult> {
+      const apply = host.updateDeploymentSettings
+      if (apply === undefined) return { ok: false, message: 'deployment settings are not editable in this composition' }
+      return apply(patch)
     },
     async presets(): Promise<PresetView[]> {
       if (host.agentPresets === undefined) return []

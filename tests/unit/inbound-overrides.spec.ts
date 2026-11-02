@@ -363,6 +363,22 @@ describe('InboundServerManager overrides', () => {
     expect(card.supportedInterfaces?.[0]?.url).toBe(`http://127.0.0.1:25675/a2a/${created.id}`)
   })
 
+  it('re-resolves a getter deployment base URL when instances are re-assembled', async () => {
+    let current = 'http://127.0.0.1:25675'
+    const { store } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', { defaultBaseUrl: (() => current) } as never), store)
+    const created = await manager.add({ ...base })
+    expect(created.ok).toBe(true)
+    const urlOf = (): string | undefined =>
+      (manager.get(created.id!)?.card as { supportedInterfaces?: Array<{ url?: string }> }).supportedInterfaces?.[0]?.url
+    expect(urlOf()).toBe(`http://127.0.0.1:25675/a2a/${created.id}`)
+    // The GUI setting changes the deployment default; re-assembling the live
+    // instance must pick the new origin up without a restart.
+    current = 'http://192.168.31.20'
+    expect((await manager.update(created.id!, {})).ok).toBe(true)
+    expect(urlOf()).toBe(`http://192.168.31.20/a2a/${created.id}`)
+  })
+
   it('accepts auto as the deployment default', async () => {
     const { store } = memoryStore()
     const host = hostWith('/srv/default', {})

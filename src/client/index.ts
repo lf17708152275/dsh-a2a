@@ -19,7 +19,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { createElement, useEffect, useState, type ReactElement } from 'react'
+import { createElement, useEffect, useRef, useState, type ReactElement } from 'react'
 import { injectDashboardStyles } from './dashboard.css.ts'
 import { updateCommandFor, updateStatusText, updateToneOf, type UpdateInfo } from './update-status.ts'
 
@@ -113,6 +113,16 @@ export interface ApiSnapshot {
   readonly peers: readonly InboundPeerView[]
   readonly sessions: readonly SessionView[]
   readonly metrics: MetricsSnapshot
+  /** Deployment-wide settings (advertised base URL mode/override). */
+  readonly settings?: DeploymentSettingsView
+}
+
+/** Advertised base URL mode as the dashboard sees it. */
+export interface DeploymentSettingsView {
+  readonly mode: 'inherit' | 'auto' | 'custom'
+  readonly baseUrl?: string
+  readonly effectiveBaseUrl: string
+  readonly configBaseUrl?: string
 }
 
 export interface MetricsSnapshot {
@@ -318,6 +328,11 @@ export function A2aSection(_props: SectionProps): ReactElement {
   // Advertised base URL override (blank = the deployment baseUrl config).
   const [inBaseUrl, setInBaseUrl] = useState('')
 
+  // Deployment settings card: advertised base URL mode (inherit / auto / custom).
+  const [baseMode, setBaseMode] = useState<'inherit' | 'auto' | 'custom'>('inherit')
+  const [baseDraft, setBaseDraft] = useState('')
+  const baseInit = useRef(false)
+
   // Outbound add/edit form (two-phase).
   const [editingOut, setEditingOut] = useState<string | null>(null)
   const [outName, setOutName] = useState('')
@@ -349,6 +364,13 @@ export function A2aSection(_props: SectionProps): ReactElement {
           setOutPreset((current) => current === '' && def !== undefined ? def : current)
           setTestInbound((current) => current === '' ? (next.inbounds[0]?.id ?? '') : current)
           setTestSkill((current) => current === '' ? (next.inbounds[0]?.skills[0]?.id ?? 'chat') : current)
+          // Seed the deployment settings form once; after that the user owns it.
+          const settings = next.settings
+          if (!baseInit.current && settings !== undefined) {
+            baseInit.current = true
+            setBaseMode(settings.mode)
+            setBaseDraft(settings.mode === 'custom' ? (settings.baseUrl ?? '') : '')
+          }
           setError(undefined)
         }
       } catch (err) {
@@ -383,6 +405,21 @@ export function A2aSection(_props: SectionProps): ReactElement {
       setUpdateError((err as Error).message)
     } finally {
       setUpdateBusy(false)
+    }
+  }
+
+  /** Persist the deployment advertised-base-URL mode; blank inherits config. */
+  const saveBaseSettings = async (): Promise<void> => {
+    const value = baseMode === 'inherit' ? '' : baseMode === 'auto' ? 'auto' : baseDraft.trim()
+    if (baseMode === 'custom' && value === '') {
+      setError('自定义模式需要一个绝对 URL（如 http://192.168.31.20）')
+      return
+    }
+    const result = await control({ action: 'settings.update', baseUrl: value })
+    if (result.ok) {
+      setBaseDraft(baseMode === 'custom' ? value : '')
+      // Re-sync from the next snapshot so the form shows the effective value.
+      baseInit.current = false
     }
   }
 
@@ -668,6 +705,35 @@ export function A2aSection(_props: SectionProps): ReactElement {
       // ══ tab: inbound servers ══════════════════════════════════════════
       tab === 'inbound'
         ? createElement('div', { className: 'dsh-a2a-stack' },
+            // Deployment-wide advertised base URL (Agent Card回连地址).
+            createElement('div', { className: 'dsh-a2a-card' },
+              h('部署设置 · 广告地址'),
+              createElement('div', { className: 'dsh-a2a-card-sub' },
+                `当前生效：${snap?.settings?.effectiveBaseUrl ?? '—'}`,
+                snap?.settings?.configBaseUrl !== undefined ? ` · 插件配置：${snap.settings.configBaseUrl}` : '',
+              ),
+              createElement('div', { className: 'dsh-a2a-btn-row' },
+                createElement('select', {
+                  className: 'dsh-a2a-input',
+                  value: baseMode,
+                  onChange: (e: { target: { value: string } }) => setBaseMode(e.target.value as 'inherit' | 'auto' | 'custom'),
+                },
+                  createElement('option', { value: 'inherit', key: 'inherit' }, '跟随插件配置'),
+                  createElement('option', { value: 'auto', key: 'auto' }, 'auto（按请求自动推导）'),
+                  createElement('option', { value: 'custom', key: 'custom' }, '自定义 URL'),
+                ),
+                baseMode === 'custom'
+                  ? createElement('input', {
+                    className: 'dsh-a2a-input',
+                    value: baseDraft,
+                    placeholder: 'http://192.168.31.20',
+                    onChange: (e: { target: { value: string } }) => setBaseDraft(e.target.value),
+                  })
+                  : null,
+                createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void saveBaseSettings() } }, '保存'),
+              ),
+              createElement('div', { className: 'dsh-a2a-card-sub' }, '广告地址写进 Agent Card，外部 A2A 客户端靠它回连（不含路径）。auto 按每次请求的 Host 推导。'),
+            ),
             createElement('div', { className: 'dsh-a2a-crew' },
               h('入站 Servers', inbounds.length),
               inbounds.length === 0

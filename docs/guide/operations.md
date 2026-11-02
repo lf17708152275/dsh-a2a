@@ -67,6 +67,13 @@ left empty.
 Skills are shown after creation; you do not type them. The preset picker lists
 the real roster and preselects the deployment default.
 
+At the top of the inbound tab, **Deployment settings · advertised URL** sets the
+deployment-wide advertised base URL without editing the profile config: *follow
+the plugin config*, *auto* (derive it from each request's forwarded host) or
+*custom URL*. The choice is stored in the plugin's own domain and applied
+immediately (live instances are re-assembled, no restart); per-instance
+overrides still win over it.
+
 The test console selects an instance, a skill, an optional `contextId` and a
 message, then shows the resulting task JSON.
 

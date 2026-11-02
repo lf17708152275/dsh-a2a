@@ -149,6 +149,22 @@ IP 变动、多入口域名都不必重新配置；请求里没有 Host 头时�
 `inbound.sendTest` 走与线上端点相同的门禁和任务生命周期，但不走 HTTP 鉴权；
 它只能从回环调用。
 
+#### 部署设置
+
+| Action | 必填 | 可选 |
+|---|---|---|
+| `settings.update` | — | `baseUrl` |
+
+`settings.update` 把部署级广告地址存进插件自己的 `a2a` 域（重启后仍在，不必改
+profile 配置），并立即重建所有存活入站实例。`baseUrl` 接受 `auto`（按每次请求
+推导回连地址，与实例级哨兵值同义）、绝对 `http(s)` 源（固定广告地址），或空值/
+省略（清除覆盖，重新继承 loader 的 `baseUrl` 配置）。
+
+当前模式也会出现在 `GET /a2a/api` 快照的 `settings` 字段里：`mode` 为
+`inherit`（跟随插件配置）、`auto`（按请求推导）或 `custom`（固定 URL），
+`baseUrl` 是已存的覆盖值（如有），`effectiveBaseUrl` 是此刻卡片广告的地址，
+`configBaseUrl` 是 loader 配置值（如有）。
+
 #### 出站
 
 | 动作 | 必填字段 | 可选字段 |

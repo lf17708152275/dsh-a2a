@@ -162,6 +162,24 @@ when no host header is present the deployment `baseUrl` is the fallback.
 `inbound.sendTest` runs the same gate and task lifecycle as the wire endpoint
 but bypasses HTTP auth; it is only reachable on loopback.
 
+#### Deployment settings
+
+| Action | Required fields | Optional fields |
+|---|---|---|
+| `settings.update` | — | `baseUrl` |
+
+`settings.update` stores the deployment-wide advertised base URL in the plugin's
+own `a2a` domain (so it survives restarts without editing the profile config)
+and immediately re-assembles every live inbound instance. `baseUrl` accepts
+`auto` (derive the origin from each request, like the per-instance sentinel), an
+absolute `http(s)` origin to pin it, or an empty/omitted value to clear the
+override and inherit the loader `baseUrl` config again.
+
+The current mode is mirrored in the `GET /a2a/api` snapshot under `settings`:
+`mode` is `inherit` (loader config), `auto` (per request) or `custom` (pinned),
+`baseUrl` is the stored override when there is one, `effectiveBaseUrl` is what
+cards advertise right now, and `configBaseUrl` is the loader value when set.
+
 #### Outbound
 
 | Action | Required fields | Optional fields |

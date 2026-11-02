@@ -39,6 +39,21 @@ export interface ModelOptionView {
   readonly name: string
 }
 
+/**
+ * Deployment-wide settings as the dashboard sees them. `mode` is the effective
+ * source of the advertised base URL: `inherit` (loader config), `auto`
+ * (derived per request) or `custom` (a pinned URL stored in the GUI).
+ */
+export interface DeploymentSettingsView {
+  readonly mode: 'inherit' | 'auto' | 'custom'
+  /** Stored override (`auto` or an origin); absent when inheriting. */
+  readonly baseUrl?: string
+  /** Origin/`auto` actually in use right now. */
+  readonly effectiveBaseUrl: string
+  /** Loader-level `baseUrl` config, when the deployment sets one. */
+  readonly configBaseUrl?: string
+}
+
 /** One inbound server instance, as the GUI/facade reads it. */
 export interface InboundServerView {
   readonly id: string
@@ -149,6 +164,10 @@ export interface A2AServiceImpl {
   models(): Promise<ModelOptionView[]>
   /** Why the catalogue looks the way it does; for support/debugging. */
   modelDiagnostics(): Promise<Record<string, unknown>>
+  /** Deployment-wide advertised base URL settings (GUI-editable). */
+  settings(): DeploymentSettingsView
+  /** Persist deployment settings; a blank `baseUrl` clears the override. */
+  updateSettings(patch: { readonly baseUrl?: string }): Promise<OpResult>
   // ── inbound server instances ────────────────────────────────────────
   listInboundServers(): InboundServerView[]
   createInboundServer(input: InboundCreateInput): Promise<OpResult>
@@ -216,6 +235,14 @@ export class A2AService extends Service {
 
   async modelDiagnostics(): Promise<Record<string, unknown>> {
     return this.impl.modelDiagnostics()
+  }
+
+  settings(): DeploymentSettingsView {
+    return this.impl.settings()
+  }
+
+  async updateSettings(patch: { readonly baseUrl?: string }): Promise<OpResult> {
+    return this.impl.updateSettings(patch)
   }
 
   async presets(): Promise<PresetView[]> {

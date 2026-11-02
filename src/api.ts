@@ -30,6 +30,7 @@ export type ApiAction =
   | { readonly action: 'task.cancel'; readonly id: string }
   | { readonly action: 'inbound.close'; readonly id: string }
   | { readonly action: 'session.cancel' | 'session.close'; readonly id: string; readonly serverId?: string }
+  | { readonly action: 'settings.update'; readonly baseUrl?: string }
 
 /** One snapshot of the whole plugin for the dashboard. */
 export interface ApiSnapshot {
@@ -43,6 +44,8 @@ export interface ApiSnapshot {
   readonly peers: readonly unknown[]
   readonly sessions: readonly unknown[]
   readonly metrics: unknown
+  /** Deployment-wide settings (advertised base URL mode/override). */
+  readonly settings: unknown
 }
 
 const DEFAULT_MAX_BODY_BYTES = 1_048_576
@@ -200,6 +203,7 @@ function snapshotOf(impl: A2AServiceImpl, params: URLSearchParams, update?: Upda
     // `status()` carries the aggregated session views when mounted.
     sessions: (status.sessions ?? impl.listSessions()) as readonly unknown[],
     metrics: impl.metrics?.() ?? {},
+    settings: impl.settings(),
   }
 }
 
@@ -252,6 +256,8 @@ async function dispatch(payload: ApiAction, impl: A2AServiceImpl): Promise<{ rea
           ...(payload.skill !== undefined ? { skill: payload.skill } : {}),
         }),
       }
+    case 'settings.update':
+      return impl.updateSettings(payload.baseUrl !== undefined ? { baseUrl: payload.baseUrl } : {})
     case 'outbound.create':
       return impl.createOutboundServer({
         name: payload.name,

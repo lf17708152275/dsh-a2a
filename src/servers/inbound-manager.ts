@@ -59,7 +59,11 @@ export interface InboundManagerHost {
   readonly attachments?: AttachmentsLike
   readonly metrics?: A2aMetrics
   readonly sessionCwd: string
-  readonly defaultBaseUrl: string
+  /**
+   * Advertised inbound base URL default: a concrete origin, `auto` (derived
+   * per request), or a getter so a GUI setting can change it at runtime.
+   */
+  readonly defaultBaseUrl: string | (() => string)
   readonly subagentProvider: string
   /** Deployment hard gate/default for the optional trace extension. */
   readonly inboundTrace: boolean
@@ -180,6 +184,11 @@ export function validateBaseUrl(raw: string | undefined): { readonly ok: true; r
 /** Per-instance advertised base URL, or the deployment default. */
 export function resolveInstanceBaseUrl(record: Pick<InboundServerRecord, 'baseUrl'>, deploymentBaseUrl: string): string {
   return record.baseUrl ?? deploymentBaseUrl
+}
+
+/** Resolve the host's base-URL source (a getter lets the GUI retune it). */
+export function deploymentBaseUrlOf(host: Pick<InboundManagerHost, 'defaultBaseUrl'>): string {
+  return typeof host.defaultBaseUrl === 'function' ? host.defaultBaseUrl() : host.defaultBaseUrl
 }
 
 /** Case-insensitive header lookup on the structural request shape. */
@@ -331,12 +340,13 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
   // origin the client reached us through (proxy headers). The static card
   // still needs a concrete origin for the facade snapshot, so it falls back to
   // the loopback default the host reports.
-  const configuredBaseUrl = resolveInstanceBaseUrl(record, host.defaultBaseUrl)
+  const deploymentBaseUrl = deploymentBaseUrlOf(host)
+  const configuredBaseUrl = resolveInstanceBaseUrl(record, deploymentBaseUrl)
   const autoBaseUrl = configuredBaseUrl === 'auto'
   // Concrete origin for the static card when the effective mode is `auto`:
   // the deployment default if it is concrete, else a loopback placeholder (the
   // served card is rebuilt per request, so this only feeds facade snapshots).
-  const staticAutoFallback = host.defaultBaseUrl === 'auto' ? 'http://127.0.0.1' : host.defaultBaseUrl
+  const staticAutoFallback = deploymentBaseUrl === 'auto' ? 'http://127.0.0.1' : deploymentBaseUrl
   const card = buildCard({ ...cardOptions, baseUrl: autoBaseUrl ? staticAutoFallback : configuredBaseUrl })
 
   // One preset-bound session pool per instance. The instance id is part of the

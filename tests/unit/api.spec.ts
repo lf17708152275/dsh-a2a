@@ -48,6 +48,10 @@ function resCollector() {
 function facadeStub(overrides: Partial<A2AServiceImpl> = {}): A2AServiceImpl {  return {
     status: () => ({ inbounds: [], outbounds: [], tasks: 0, peers: [] }),
     presets: vi.fn(async () => []),
+    models: vi.fn(async () => []),
+    modelDiagnostics: vi.fn(async () => ({})),
+    settings: () => ({ mode: 'inherit' as const, effectiveBaseUrl: 'http://127.0.0.1:25675' }),
+    updateSettings: vi.fn(async () => ({ ok: true, message: 'settings updated' })),
     listInboundServers: () => [],
     createInboundServer: vi.fn(async () => ({ ok: true, message: 'created', id: 'in-1' })),
     removeInboundServer: vi.fn(async () => ({ ok: true, message: 'removed' })),
