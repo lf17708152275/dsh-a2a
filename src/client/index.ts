@@ -812,7 +812,18 @@ export function A2aSection(_props: SectionProps): ReactElement {
                           createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono' }, `v${v.version}`),
                           ...(v.trace ? [createElement('span', { className: 'dsh-a2a-badge', key: 'trace' }, 'trace')] : []),
                           ...(v.model !== undefined || v.provider !== undefined
-                            ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'model' }, [v.provider, v.model].filter((x): x is string => x !== undefined && x.length > 0).join('/'))]
+                            ? (() => {
+                                const label = [v.provider, v.model].filter((x): x is string => x !== undefined && x.length > 0).join('/')
+                                // A pinned model that the host no longer serves fails every request,
+                                // so surface it instead of letting the endpoint look healthy.
+                                const missing = models.length > 0 && !models.some((m) => m.provider === v.provider && m.id === v.model)
+                                return [createElement('span', {
+                                  className: 'dsh-a2a-badge dsh-a2a-mono',
+                                  key: 'model',
+                                  title: missing ? '这个模型已不在宿主的模型清单里，请求会失败；请清空或改选模型' : '该实例钉住的模型',
+                                  style: missing ? { color: '#e5484d', borderColor: '#e5484d' } : undefined,
+                                }, missing ? `⚠ ${label}（已失效）` : label)]
+                              })()
                             : []),
                           ...(v.workspace !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'ws', title: v.workspace }, 'cwd')] : []),
                           createElement('span', { className: 'dsh-a2a-auth' }, v.authTokenEnv !== undefined ? '· 已配置鉴权' : '· 匿名'),
