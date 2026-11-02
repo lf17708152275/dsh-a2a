@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describePlugin, mountedPluginCount, presetCapabilities, shortModuleName, type CompositionLike } from '../../src/server/preset-capabilities.ts'
+import { capabilitiesFromInspections, describePlugin, mountedPluginCount, presetCapabilities, shortModuleName, type CompositionLike } from '../../src/server/preset-capabilities.ts'
 
 const roster = [
   { id: 'card-01', name: '奶糖妹妹' },
@@ -104,5 +104,35 @@ describe('describePlugin', () => {
     expect(shortModuleName('@deepseek-ai/dsh-tool-fs')).toBe('dsh-tool-fs')
     expect(shortModuleName('dsh-nekowhale-stickers')).toBe('dsh-nekowhale-stickers')
     expect(shortModuleName('@a/b/c')).toBe('b/c')
+  })
+})
+
+describe('capabilitiesFromInspections', () => {
+  const inspections = [
+    { id: 'card-01', modules: [{ moduleName: '@deepseek-ai/dsh-persona' }, { moduleName: '@deepseek-ai/dsh-tool-bash' }] },
+    { id: 'standard', modules: [] },
+  ]
+
+  it('projects module names as enabled rows labelled for the dashboard', () => {
+    const capabilities = capabilitiesFromInspections(roster, inspections)
+    const card = capabilities.get('card-01')
+    expect(card?.source).toBe('inspection')
+    expect(card?.plugins.map((plugin) => plugin.module)).toEqual(['@deepseek-ai/dsh-persona', '@deepseek-ai/dsh-tool-bash'])
+    expect(card?.plugins[0]?.label).toBe('人格提示词')
+    expect(card?.plugins.every((plugin) => plugin.enabled === true)).toBe(true)
+    expect(mountedPluginCount(card)).toBe(2)
+  })
+
+  it('keeps roster presets that have no inspection row', () => {
+    const capabilities = capabilitiesFromInspections(roster, inspections)
+    expect(capabilities.get('broken-one')?.plugins).toEqual([])
+    expect(capabilities.get('standard')?.plugins).toEqual([])
+  })
+
+  it('returns empty lists when the host has no inspections either', () => {
+    for (const input of [undefined, []] as const) {
+      const capabilities = capabilitiesFromInspections(roster, input)
+      expect([...capabilities.values()].every((capability) => capability.plugins.length === 0)).toBe(true)
+    }
   })
 })

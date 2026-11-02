@@ -52,10 +52,23 @@ export interface CompositionLike {
   readonly rows?: readonly CompositionRowLike[]
 }
 
+/** One module row from `inspectCompositions()`. */
+export interface InspectionModuleLike {
+  readonly moduleName: string
+}
+
+/** A preset inspection row as `inspectCompositions()` reports it. */
+export interface InspectionLike {
+  readonly id: string
+  readonly modules?: readonly InspectionModuleLike[]
+}
+
 /** Capability data for one preset. */
 export interface PresetCapabilities {
   readonly plugins: readonly PresetPluginView[]
   readonly broken?: boolean
+  /** Where the rows came from: the inventory is richer than an inspection. */
+  readonly source?: 'inventory' | 'inspection'
 }
 
 /** Friendly names for the plugin modules the dashboard commonly sees. */
@@ -129,7 +142,45 @@ export function presetCapabilities(
     result.set(row.id, {
       plugins,
       ...(composition.broken === true ? { broken: true } : {}),
+      source: 'inventory',
     })
+  }
+  return result
+}
+
+/**
+ * Fallback capability projection from `inspectCompositions()`.
+ * The inspection reports module names but not per-row enablement, so every row
+ * is reported as enabled; it is only used when the host cannot return a full
+ * composition inventory.
+ * @param rows - the preset roster.
+ * @param inspections - host inspections, or undefined.
+ * @returns capabilities keyed by preset id with `source: 'inspection'`.
+ */
+export function capabilitiesFromInspections(
+  rows: readonly PresetRosterRowLike[],
+  inspections: readonly InspectionLike[] | undefined,
+): Map<string, PresetCapabilities> {
+  const byId = new Map<string, InspectionLike>()
+  for (const inspection of inspections ?? []) byId.set(inspection.id, inspection)
+  const result = new Map<string, PresetCapabilities>()
+  for (const row of rows) {
+    const inspection = byId.get(row.id)
+    if (inspection === undefined) {
+      result.set(row.id, { plugins: [], source: 'inspection' })
+      continue
+    }
+    const plugins = (inspection.modules ?? []).map((module): PresetPluginView => {
+      const descriptor = describePlugin(module.moduleName)
+      return {
+        entryId: null,
+        module: module.moduleName,
+        enabled: true,
+        label: descriptor.label,
+        ...(descriptor.hint !== undefined ? { hint: descriptor.hint } : {}),
+      }
+    })
+    result.set(row.id, { plugins, source: 'inspection' })
   }
   return result
 }

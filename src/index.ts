@@ -39,7 +39,7 @@ import { A2AService, type A2AServiceImpl, type DeploymentSettingsView, type Inbo
 import { buildA2aCommand } from './commands.ts'
 import { InboundServerManager, DomainInboundStore, resolveAuthToken, validateBaseUrl, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
 import { readDeploymentSettings, writeDeploymentSettings, type DeploymentSettingsRecord } from './server/settings.ts'
-import { presetCapabilities, type CompositionLike } from './server/preset-capabilities.ts'
+import { presetCapabilities, capabilitiesFromInspections, type CompositionLike, type InspectionLike } from './server/preset-capabilities.ts'
 import { discoverBaseUrlCandidates } from './server/net.ts'
 import { adoptSessions, registerDefaultWorkspace, type WorkspaceAttachLike, type WorkspaceCreatorLike, type WorkspaceRegistrationStatus } from './server/default-workspace.ts'
 import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, type OutboundServerView } from './servers/outbound-manager.ts'
@@ -346,6 +346,8 @@ export interface AgentPresetRosterHost {
   list(): Promise<Array<{ id: string; name?: string; description?: string }>>
   /** Declaration rows + activation state for every registered preset. */
   compositionInventory?(): Promise<readonly CompositionLike[]>
+  /** Coarser fallback: module names per preset without activation states. */
+  inspectCompositions?(): readonly InspectionLike[]
   readonly defaultId?: string
 }
 
@@ -375,6 +377,8 @@ interface FacadeHost {
 
 /** Facade closure over the two managers (commands and `ctx.a2a` consumers). */
 function makeFacade(host: FacadeHost): A2AServiceImpl {
+  /** Log the capability projection once per plugin lifetime, not per snapshot. */
+  let capabilitiesLogged = false
   /** Current deployment default base URL (`auto` or a concrete origin). */
   const hostBaseUrl = (): string | undefined => {
     const source = host.defaultBaseUrl
@@ -511,7 +515,23 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
           compositions = undefined
         }
       }
-      const capabilities = presetCapabilities(rows, compositions)
+      let capabilities = presetCapabilities(rows, compositions)
+      let source: 'inventory' | 'inspection' | 'unavailable' = compositions === undefined ? 'unavailable' : 'inventory'
+      const described = (projection: Map<string, { plugins: readonly unknown[] }>): number =>
+        [...projection.values()].filter((capability) => capability.plugins.length > 0).length
+      // An inventory that describes nothing is as useless as a missing one.
+      if (described(capabilities) === 0 && host.agentPresets.inspectCompositions !== undefined) {
+        try {
+          capabilities = capabilitiesFromInspections(rows, host.agentPresets.inspectCompositions())
+          source = 'inspection'
+        } catch {
+          source = 'unavailable'
+        }
+      }
+      if (!capabilitiesLogged) {
+        capabilitiesLogged = true
+        host.logger(`[a2a] preset capabilities: source=${source}, presets=${rows.length}, with-plugins=${described(capabilities)}`)
+      }
       return rows.map((preset) => {
         const capability = capabilities.get(preset.id)
         return {
