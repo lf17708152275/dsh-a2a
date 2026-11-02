@@ -148,13 +148,16 @@ optional and independent; omitted (or empty) values fall back to the
 deployment default model. Passing an empty string on `inbound.update` clears a
 previously stored override.
 
-`baseUrl` overrides the base URL advertised in this instance's agent card
-(for example `http://192.168.31.20` or `https://companion.example.com`). Use it
-when the server binds loopback behind a reverse proxy or tunnel and external
-clients must call back through another address. It must be an absolute
-`http(s)` URL without a path; a trailing slash is trimmed. Omitted (or empty)
-means "inherit the deployment `baseUrl` config". Only the advertised URL
+`baseUrl` is an API-level override of the base URL advertised in this
+instance's agent card (for example `http://192.168.31.20`). It must be an
+absolute `http(s)` URL without a path; a trailing slash is trimmed. Omitted (or
+empty) means "inherit the deployment `baseUrl` config". Only the advertised URL
 changes — the routes keep being served by the host web server.
+
+The dashboard no longer exposes this per-inbound field: the advertised base URL
+is deployment-wide and lives in the **Deployment settings** card (see
+`settings.update` below). The field stays accepted here so existing automation
+and records that already carry it keep working.
 
 The special value `auto` derives the advertised origin from each request's
 `X-Forwarded-Host` (or `Host`) and `X-Forwarded-Proto` headers, so the card

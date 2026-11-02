@@ -56,16 +56,15 @@ chips and the live card URL. Actions:
 | **Delete** | Disposes the live instance and removes the persisted record |
 | **Clear auth** | Appears on an authenticated instance; removes the stored token and rebuilds it anonymously |
 
-The create/edit form has name, version, preset, workspace, advertised base URL,
-provider, model, bearer token and description. `workspace` (absolute path to an
+The create/edit form has name, version, preset, workspace, provider, model,
+bearer token and description. `workspace` (absolute path to an
 existing directory) pins that instance's agent sessions to a local project —
 leave it empty and the plugin owns `~/.dsh/a2a-sessions` as a host workspace so
 those sessions stay visible in the host session list;
-`provider` and `model` pin its model selection; the advertised base URL changes
-the address written into this instance's agent card so external A2A clients call
-back through a reachable host (type `auto` to derive it from each request's
-forwarded host). All four are optional and inherit the deployment default when
-left empty.
+`provider` and `model` pin its model selection. All three are optional and
+inherit the deployment default when left empty. The advertised base URL is no
+longer configured per inbound: the **deployment settings** card at the top of the
+tab owns it for the whole deployment (see below).
 Skills are shown after creation; you do not type them. The preset picker lists
 the real roster and preselects the deployment default.
 
