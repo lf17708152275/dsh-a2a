@@ -104,6 +104,10 @@ skill count, the tool count and `lastError` when failed. Actions:
 The edit form can disable individual skills and accepts a JSON
 `skillOverrides` object (`{"chat": {"name": "...", "description": "..."}}`).
 
+A fresh inbound session is **titled after its context id** (for example
+`wx3-uf437c8af9814`), so the DSH session list shows which contact it belongs to.
+Titles you renamed yourself are never overwritten.
+
 A token is stored through the credentials service. Leaving the token field empty
 keeps the existing one. The inbound form has **Clear auth**; the outbound form
 has no clear button — send an empty `token` through `outbound.setAuth` to

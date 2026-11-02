@@ -28,6 +28,7 @@ import { mkdirSync } from 'node:fs'
 import { openDomain, DomainTaskStore, type A2aDomain, type TaskStore } from './server/store.ts'
 import type { ModelOptionView } from './service.ts'
 import { probeService, type AgentPresetsLike, type AgentRegistryLike, type AttachmentsLike, type CredentialsLike, type SkillsLike } from './server/exec/agent-runtime.ts'
+import { nameNewSession, type SessionRenamerLike } from './server/session-titles.ts'
 import { aggregateSessionViews, type SessionView } from './server/session-registry.ts'
 import { A2aMetrics } from './server/metrics.ts'
 import { isTerminal, Role } from './protocol.ts'
@@ -144,6 +145,17 @@ export function apply(ctx: Context, config: A2AConfig) {
       // Sessions opened by cwd are not accounted by the host unless the
       // directory is a workspace *and* the session is attached to it; attach
       // validates the stored cwd, so a foreign session is skipped, not failed.
+      /**
+       * Title a fresh inbound session with the context id the bridge bound it to,
+       * so the dashboard list reads `wx3-...` instead of an opaque session id.
+       */
+      const nameInboundSession = async (sessionId: string, contextId: string): Promise<void> => {
+        const controller = probeService(ctx, 'sessionController', 'rename') as SessionRenamerLike | undefined
+        await nameNewSession(controller, sessionId, contextId, {
+          onError: (error) => logger.warn(`[a2a] could not title inbound session ${sessionId}: ${(error as Error).message}`),
+        })
+      }
+
       const adoptSessionsInto = async (cwd: string, sessionIds: readonly string[]): Promise<number> => {
         const registry = probeService(ctx, 'workspaceRegistry', 'resolveByPath') as WorkspaceResolverLike | undefined
         if (registry === undefined) return 0
@@ -217,6 +229,7 @@ export function apply(ctx: Context, config: A2AConfig) {
         reviveArchivedSession,
         onSessionOpened: async (info) => {
           await adoptSessionsInto(info.cwd, [info.sessionId])
+          await nameInboundSession(info.sessionId, info.contextId)
         },
         sessionCwd: inboundCwd,
         defaultBaseUrl: effectiveBaseUrl,
