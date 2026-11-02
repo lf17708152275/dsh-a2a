@@ -55,7 +55,10 @@ startup.
 
 1. Restart DSH and open **Settings → A2A 连接**.
 2. Create an inbound server: pick a name, a preset and optionally a bearer
-   token. The endpoint and card are live immediately.
+   token. The endpoint and card are live immediately. Each preset option shows
+   how many plugins it mounts, and expanding **capabilities** lists them (with
+   friendly names); the same chips appear on the instance card, so you always
+   know what an A2A session from that endpoint can do.
 3. Add an outbound connection: paste a remote AgentCard URL, click **Import**,
    review the discovered skills, then **Connect**.
 
