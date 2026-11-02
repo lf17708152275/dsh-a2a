@@ -86,6 +86,17 @@ export interface InboundManagerHost {
    * explicit activity, so the session is revived instead.
    */
   readonly reviveArchivedSession?: (sessionId: string) => void | Promise<void>
+  /**
+   * Called once per opened session with its resolved `cwd`, best effort. The
+   * plugin uses it to account the session under the host workspace that owns
+   * that directory, so inbound conversations show up in the host session list.
+   */
+  readonly onSessionOpened?: (info: {
+    readonly serverId: string
+    readonly contextId: string
+    readonly sessionId: string
+    readonly cwd: string
+  }) => void | Promise<void>
   /** Allocate a fresh stable instance id. */
   readonly newId: () => string
 }
@@ -376,10 +387,17 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
       // namespaces the binding by inbound instance. The write is memory-first
       // (write-chain visible); a durability failure must not fail the task
       // that just opened the session — log and continue.
-      onSessionOpened: (info) => tasks.setContextSession(info.contextId, info.sessionId)
-        .catch((err: unknown) => {
-          host.logger.error(`[a2a:${record.id}] context binding persist failed: ${String(err)}`)
-        }),
+      onSessionOpened: (info) => {
+        tasks.setContextSession(info.contextId, info.sessionId)
+          .catch((err: unknown) => {
+            host.logger.error(`[a2a:${record.id}] context binding persist failed: ${String(err)}`)
+          })
+        // Fire and forget: a host without a workspace registry simply skips.
+        void Promise.resolve(host.onSessionOpened?.({ ...info, serverId: record.id, cwd: sessionCwd }))
+          .catch((err: unknown) => {
+            host.logger.warn(`[a2a:${record.id}] workspace accounting failed: ${String(err)}`)
+          })
+      },
       ...(host.reviveArchivedSession !== undefined ? { reviveArchivedSession: host.reviveArchivedSession } : {}),
     })
     : undefined

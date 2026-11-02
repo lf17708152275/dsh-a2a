@@ -17,6 +17,15 @@ export interface WorkspaceCreatorLike {
   create(path: string, title?: string): Promise<unknown>
 }
 
+/**
+ * Structural slice of one workspace entity: sessions already accounted (for
+ * the idempotent skip) and the validated attach.
+ */
+export interface WorkspaceAttachLike {
+  readonly sessionIds?: readonly string[]
+  attachSession(sessionId: string): Promise<void>
+}
+
 /** Display title used when the default inbound workspace is first created. */
 export const DEFAULT_INBOUND_WORKSPACE_TITLE = 'A2A Sessions'
 
@@ -65,4 +74,40 @@ export async function registerDefaultWorkspace(
     options.onError?.(directory, error)
     return 'failed'
   }
+}
+
+/**
+ * Account existing sessions under a workspace.
+ *
+ * The host only attaches a session when it is opened *through* that workspace;
+ * sessions the plugin opened by `cwd` (every inbound context) therefore stay
+ * unaccounted and invisible in the host session list, even once the directory
+ * itself is registered. Attach is validated against the stored header cwd, so
+ * a session belonging to another workspace rejects — a mismatch is skipped,
+ * never fatal, and the count reports only the adoptions that happened.
+ * @param workspace - the resolved workspace entity, or undefined when absent.
+ * @param sessionIds - candidate session ids (duplicates and unknowns are fine).
+ * @param options - optional failure observer.
+ * @returns how many sessions the workspace newly accounted.
+ */
+export async function adoptSessions(
+  workspace: WorkspaceAttachLike | undefined,
+  sessionIds: readonly string[],
+  options: { readonly onError?: (sessionId: string, error: unknown) => void } = {},
+): Promise<number> {
+  if (workspace === undefined) return 0
+  const accounted = new Set(workspace.sessionIds ?? [])
+  const seen = new Set<string>()
+  let adopted = 0
+  for (const sessionId of sessionIds) {
+    if (seen.has(sessionId) || accounted.has(sessionId)) continue
+    seen.add(sessionId)
+    try {
+      await workspace.attachSession(sessionId)
+      adopted += 1
+    } catch (error) {
+      options.onError?.(sessionId, error)
+    }
+  }
+  return adopted
 }

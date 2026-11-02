@@ -11,7 +11,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_INBOUND_WORKSPACE_TITLE,
+  adoptSessions,
   registerDefaultWorkspace,
+  type WorkspaceAttachLike,
   type WorkspaceCreatorLike,
 } from '../../src/server/default-workspace.ts'
 
@@ -78,5 +80,58 @@ describe('default inbound workspace registration', () => {
     expect(ok).toBe('failed')
     expect(onRegistered).not.toHaveBeenCalled()
     expect(errors).toEqual([failure])
+  })
+})
+
+/** Workspace stub that records attachments and rejects listed ids. */
+function fakeWorkspace(initial: readonly string[] = [], rejected: readonly string[] = []): {
+  workspace: WorkspaceAttachLike
+  attached: string[]
+  rejectedSet: Set<string>
+} {
+  const attached: string[] = []
+  const accounted = [...initial]
+  const rejectedSet = new Set(rejected)
+  const workspace: WorkspaceAttachLike = {
+    get sessionIds() {
+      return accounted
+    },
+    attachSession: async (sessionId: string) => {
+      if (rejectedSet.has(sessionId)) throw new Error(`session '${sessionId}' belongs elsewhere`)
+      attached.push(sessionId)
+      accounted.push(sessionId)
+    },
+  }
+  return { workspace, attached, rejectedSet }
+}
+
+describe('default workspace session adoption', () => {
+  it('attaches sessions the workspace does not account yet', async () => {
+    const { workspace, attached } = fakeWorkspace(['old-1'])
+    const adopted = await adoptSessions(workspace, ['s-1', 's-2'])
+    expect(adopted).toBe(2)
+    expect(attached).toEqual(['s-1', 's-2'])
+  })
+
+  it('skips sessions already accounted and duplicate candidates', async () => {
+    const { workspace, attached } = fakeWorkspace(['s-1'])
+    const adopted = await adoptSessions(workspace, ['s-1', 's-2', 's-2'])
+    expect(adopted).toBe(1)
+    expect(attached).toEqual(['s-2'])
+  })
+
+  it('keeps going past a session that belongs to another workspace', async () => {
+    const { workspace, attached } = fakeWorkspace([], ['foreign'])
+    const errors: string[] = []
+    const adopted = await adoptSessions(workspace, ['foreign', 'mine'], {
+      onError: (sessionId) => errors.push(sessionId),
+    })
+    expect(adopted).toBe(1)
+    expect(attached).toEqual(['mine'])
+    expect(errors).toEqual(['foreign'])
+  })
+
+  it('is a no-op without a workspace', async () => {
+    await expect(adoptSessions(undefined, ['s-1'])).resolves.toBe(0)
   })
 })

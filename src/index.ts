@@ -39,10 +39,15 @@ import { buildA2aCommand } from './commands.ts'
 import { InboundServerManager, DomainInboundStore, resolveAuthToken, validateBaseUrl, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
 import { readDeploymentSettings, writeDeploymentSettings, type DeploymentSettingsRecord } from './server/settings.ts'
 import { discoverBaseUrlCandidates } from './server/net.ts'
-import { registerDefaultWorkspace, type WorkspaceCreatorLike, type WorkspaceRegistrationStatus } from './server/default-workspace.ts'
+import { adoptSessions, registerDefaultWorkspace, type WorkspaceAttachLike, type WorkspaceCreatorLike, type WorkspaceRegistrationStatus } from './server/default-workspace.ts'
 import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, type OutboundServerView } from './servers/outbound-manager.ts'
 
 export const name = 'a2a'
+
+/** Structural slice of `ctx.workspaceRegistry` used to resolve a directory. */
+interface WorkspaceResolverLike {
+  resolveByPath(path: string): Promise<unknown>
+}
 
 /** Structural slice of `ctx.workspaceRegistry` used to lift stale archive flags. */
 interface WorkspaceRegistryLike {
@@ -136,6 +141,39 @@ export function apply(ctx: Context, config: A2AConfig) {
       // only lists sessions whose cwd is a registered workspace, so own that
       // directory. Idempotent — the host reuses an existing record — hence it
       // runs once per start and again whenever an inbound is saved blank.
+      // Sessions opened by cwd are not accounted by the host unless the
+      // directory is a workspace *and* the session is attached to it; attach
+      // validates the stored cwd, so a foreign session is skipped, not failed.
+      const adoptSessionsInto = async (cwd: string, sessionIds: readonly string[]): Promise<number> => {
+        const registry = probeService(ctx, 'workspaceRegistry', 'resolveByPath') as WorkspaceResolverLike | undefined
+        if (registry === undefined) return 0
+        try {
+          const workspace = (await registry.resolveByPath(cwd)) as WorkspaceAttachLike | undefined
+          return await adoptSessions(workspace, sessionIds)
+        } catch (error) {
+          logger.warn(`[a2a] workspace accounting failed for ${cwd}: ${(error as Error).message}`)
+          return 0
+        }
+      }
+      // Session ids this domain already bound to a context (historical ones
+      // included); persisted as `{"sessionId":...}` strings.
+      const knownInboundSessionIds = (): readonly string[] => {
+        const ids: string[] = []
+        try {
+          for (const [, raw] of domain.contexts.entries()) {
+            try {
+              const parsed = JSON.parse(raw) as { sessionId?: unknown }
+              if (typeof parsed.sessionId === 'string') ids.push(parsed.sessionId)
+            } catch {
+              // an unreadable binding cannot name a session; skip it
+            }
+          }
+        } catch {
+          // a listing failure must not fail the caller
+        }
+        return ids
+      }
+      let workspaceSwept = false
       const ensureInboundWorkspace = (): Promise<WorkspaceRegistrationStatus> =>
         registerDefaultWorkspace(
           probeService(ctx, 'workspaceRegistry', 'create') as WorkspaceCreatorLike | undefined,
@@ -144,7 +182,14 @@ export function apply(ctx: Context, config: A2AConfig) {
             onRegistered: (dir) => logger.info(`[a2a] default inbound workspace registered: ${dir}`),
             onError: (dir, error) => logger.warn(`[a2a] default inbound workspace registration failed for ${dir}: ${(error as Error).message}`),
           },
-        )
+        ).then(async (status) => {
+          if (status === 'registered' && !workspaceSwept) {
+            workspaceSwept = true
+            const adopted = await adoptSessionsInto(inboundCwd, knownInboundSessionIds())
+            if (adopted > 0) logger.info(`[a2a] adopted ${adopted} existing inbound session(s) into the default workspace`)
+          }
+          return status
+        })
       // GUI-editable deployment overrides live in the `a2a` domain and win over
       // the loader config; an absent value inherits the config, then loopback.
       let deploymentSettings = readDeploymentSettings(domain)
@@ -170,6 +215,9 @@ export function apply(ctx: Context, config: A2AConfig) {
         ...(agentPresets?.defaultId !== undefined ? { defaultPresetId: agentPresets.defaultId } : {}),
         resolveDefaultModel: () => resolveDefaultModel(ctx),
         reviveArchivedSession,
+        onSessionOpened: async (info) => {
+          await adoptSessionsInto(info.cwd, [info.sessionId])
+        },
         sessionCwd: inboundCwd,
         defaultBaseUrl: effectiveBaseUrl,
         subagentProvider,
