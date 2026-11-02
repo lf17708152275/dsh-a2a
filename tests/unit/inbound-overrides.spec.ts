@@ -390,6 +390,40 @@ describe('InboundServerManager overrides', () => {
     expect(card.supportedInterfaces?.[0]?.url).toBe(`http://127.0.0.1/a2a/${created.id}`)
   })
 
+  it('serves the auto card from the card route using the request host', async () => {
+    // Regression: the exact AgentCard route used to answer with the static
+    // `server.card`, so `auto` mode only worked in direct `handle()` calls and
+    // real HTTP clients saw the fallback loopback origin.
+    const routes: Array<{
+      path: string
+      handler: (req: unknown, res: unknown) => void | Promise<void>
+    }> = []
+    const webServer = {
+      register: (route: { path: string; handler: (req: unknown, res: unknown) => void | Promise<void> }) => {
+        routes.push(route)
+        return () => {}
+      },
+    } as unknown as WebServerLike
+    const { store } = memoryStore()
+    const host = hostWith('/srv/default', { webServer, defaultBaseUrl: () => 'auto' } as never)
+    const manager = new InboundServerManager(host, store)
+    const created = await manager.add({ ...base })
+    expect(created.ok).toBe(true)
+    const cardRoute = routes.find((route) => route.path.endsWith('/agent-card.json'))
+    expect(cardRoute).toBeDefined()
+    const servedUrl = async (headers: Record<string, string>): Promise<string | undefined> => {
+      let body = ''
+      const res = { writeHead() {}, end(text?: string) { body = text ?? '' } }
+      await cardRoute!.handler({ method: 'GET', url: cardRoute!.path, headers }, res)
+      return (JSON.parse(body) as { supportedInterfaces?: Array<{ url?: string }> })
+        .supportedInterfaces?.[0]?.url
+    }
+    expect(await servedUrl({ host: '192.168.31.20' })).toBe(`http://192.168.31.20/a2a/${created.id}`)
+    expect(await servedUrl({ 'x-forwarded-host': 'lan.example.com', 'x-forwarded-proto': 'https' }))
+      .toBe(`https://lan.example.com/a2a/${created.id}`)
+    expect(await servedUrl({})).toBe(`http://127.0.0.1/a2a/${created.id}`)
+  })
+
   it('refuses an update that points at a non-directory', async () => {
     const { store, rows } = memoryStore()
     const manager = new InboundServerManager(hostWith('/srv/default', {}), store)

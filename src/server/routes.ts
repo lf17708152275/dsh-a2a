@@ -45,9 +45,11 @@ export class A2aRoutes {
       this.webServer.register({
         kind: 'exact',
         path: this.cardPath,
-        handler: (_req, res) => {
-          res.writeHead(200, { 'content-type': 'application/json' })
-          res.end(JSON.stringify(this.server.card))
+        handler: (req, res) => {
+          // `auto` base URL mode derives the advertised origin per request, so
+          // the card route must ask the server rather than reuse `.card`.
+          res.writeHead(200, { 'content-type': 'application/json', 'a2a-version': PROTOCOL_VERSION })
+          res.end(JSON.stringify(this.server.cardFor(toServerReq(req))))
         },
       }),
     )

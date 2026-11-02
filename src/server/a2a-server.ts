@@ -217,10 +217,19 @@ export class A2AServer {
     return undefined
   }
 
+  /**
+   * The AgentCard to advertise for one request: the static card unless a
+   * `cardForRequest` hook is configured (used by the `auto` base URL mode).
+   * Routes that serve the card directly must go through this, not `.card`.
+   */
+  cardFor(req: ServerRequest): AgentCard {
+    return this.opts.cardForRequest?.(req) ?? this.card
+  }
+
   /** Route one inbound HTTP request (GET card, POST JSON-RPC). */
   async handle(req: ServerRequest, body: string): Promise<ServerResponseSpec> {
     const path = (req.url ?? '').split('?')[0] ?? ''
-    const card = this.opts.cardForRequest?.(req) ?? this.card
+    const card = this.cardFor(req)
     if (req.method === 'GET' && path === this.cardPath()) {
       return { status: 200, contentType: 'application/json', body: JSON.stringify(card), headers: { 'A2A-Version': PROTOCOL_VERSION } }
     }
