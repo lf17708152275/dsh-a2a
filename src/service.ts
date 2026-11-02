@@ -27,6 +27,10 @@ export interface PresetPluginView {
   readonly enabled: boolean | 'conditional'
   /** The `!!js` condition source for conditional rows. */
   readonly condition?: string
+  /** Display name of the module (falls back to its short name). */
+  readonly label?: string
+  /** One-line explanation of what the plugin does. */
+  readonly hint?: string
 }
 
 /** Agent-preset roster row shown in the instance pickers. */

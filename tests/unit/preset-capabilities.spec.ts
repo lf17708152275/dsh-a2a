@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mountedPluginCount, presetCapabilities, type CompositionLike } from '../../src/server/preset-capabilities.ts'
+import { describePlugin, mountedPluginCount, presetCapabilities, shortModuleName, type CompositionLike } from '../../src/server/preset-capabilities.ts'
 
 const roster = [
   { id: 'card-01', name: '奶糖妹妹' },
@@ -34,13 +34,23 @@ describe('presetCapabilities', () => {
     ])
     expect(card?.plugins[2]?.enabled).toBe(false)
     expect(card?.plugins[0]?.entryId).toBe('persona')
+    expect(card?.plugins[0]?.label).toBe('人格提示词')
+    expect(card?.plugins[1]?.label).toBe('终端命令')
+    expect(card?.plugins[1]?.hint).toContain('shell')
   })
 
   it('keeps conditional rows and their expression', () => {
     const capabilities = presetCapabilities(roster, compositions)
     const standard = capabilities.get('standard')
     expect(standard?.plugins).toEqual([
-      { entryId: null, module: '@deepseek-ai/dsh-persona', enabled: 'conditional', condition: '!!js ctx.has(...)' },
+      {
+        entryId: null,
+        module: '@deepseek-ai/dsh-persona',
+        enabled: 'conditional',
+        condition: '!!js ctx.has(...)',
+        label: '人格提示词',
+        hint: '系统提示词里的人设部分（卡片的正文就挂在这里）',
+      },
     ])
   })
 
@@ -71,5 +81,28 @@ describe('mountedPluginCount', () => {
     expect(mountedPluginCount(capabilities.get('standard'))).toBe(1)
     expect(mountedPluginCount(capabilities.get('broken-one'))).toBe(0)
     expect(mountedPluginCount(undefined)).toBe(0)
+  })
+})
+
+describe('describePlugin', () => {
+  it('maps known modules to Chinese labels with a hint', () => {
+    expect(describePlugin('@deepseek-ai/dsh-persona')).toEqual({
+      label: '人格提示词',
+      hint: '系统提示词里的人设部分（卡片的正文就挂在这里）',
+    })
+    expect(describePlugin('@deepseek-ai/dsh-tool-bash').label).toBe('终端命令')
+    expect(describePlugin('dsh-nekowhale-stickers').label).toBe('表情包')
+  })
+
+  it('falls back to the short module name for unknown plugins', () => {
+    expect(describePlugin('@someone/dsh-custom-tool')).toEqual({ label: 'dsh-custom-tool' })
+    expect(describePlugin('my-plugin')).toEqual({ label: 'my-plugin' })
+    expect(describePlugin('@scope/plugin').hint).toBeUndefined()
+  })
+
+  it('strips only the scope from module names', () => {
+    expect(shortModuleName('@deepseek-ai/dsh-tool-fs')).toBe('dsh-tool-fs')
+    expect(shortModuleName('dsh-nekowhale-stickers')).toBe('dsh-nekowhale-stickers')
+    expect(shortModuleName('@a/b/c')).toBe('b/c')
   })
 })

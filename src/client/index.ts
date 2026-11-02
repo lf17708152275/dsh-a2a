@@ -101,6 +101,10 @@ export interface PresetPluginView {
   readonly module: string
   readonly enabled: boolean | 'conditional'
   readonly condition?: string
+  /** Display name of the module (falls back to its short name). */
+  readonly label?: string
+  /** One-line explanation of what the plugin does. */
+  readonly hint?: string
 }
 
 export interface PresetView {
@@ -311,10 +315,20 @@ export function mountedPluginCount(preset: PresetView | undefined): number {
 
 /** Human label for one plugin row. */
 export function pluginLabel(plugin: PresetPluginView): string {
-  const short = plugin.module.replace(/^@deepseek-ai\//, '')
-  if (plugin.enabled === false) return `${short}（已关闭）`
-  if (plugin.enabled === 'conditional') return `${short}（条件：${plugin.condition ?? '?'}）`
-  return short
+  const name = plugin.label ?? plugin.module.replace(/^@[^/]+\//, '')
+  if (plugin.enabled === false) return `${name}（已关闭）`
+  if (plugin.enabled === 'conditional') return `${name}（条件：${plugin.condition ?? '?'}）`
+  return name
+}
+
+/** Hover text for one plugin chip: friendly hint, module, condition. */
+export function pluginTitle(plugin: PresetPluginView): string {
+  const parts = [plugin.hint ?? plugin.module]
+  parts.push(`模块：${plugin.module}`)
+  if (plugin.entryId !== null) parts.push(`行 id：${plugin.entryId}`)
+  if (plugin.enabled === 'conditional') parts.push(`条件：${plugin.condition ?? '?'}`)
+  if (plugin.enabled === false) parts.push('状态：已关闭')
+  return parts.join('\n')
 }
 
 type SectionProps = PropsRuntime<'settings.section'>
@@ -841,7 +855,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                           ...plugins.map((plugin, i) => createElement('span', {
                             className: 'dsh-a2a-skill',
                             key: `${plugin.module}:${plugin.entryId ?? i}`,
-                            title: plugin.enabled === 'conditional' ? `条件表达式：${plugin.condition ?? '?'}` : (plugin.enabled ? '启用' : '已关闭'),
+                            title: pluginTitle(plugin),
                           }, pluginLabel(plugin))),
                         ),
                   )

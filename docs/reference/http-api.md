@@ -27,7 +27,7 @@ loopback peers (`127.0.0.1`, `::1`, `::ffff:127.0.0.1`); any other peer gets
 | Method and path | Returns |
 |---|---|
 | `GET /a2a/api` | Snapshot: `{ version, inbounds, outbounds, tasks, taskTotal, taskNextOffset, peers, sessions, metrics }` |
-| `GET /a2a/api/presets` | Agent-preset roster with the plugins each preset mounts: `[{ id, name?, description?, isDefault?, broken?, plugins?: [{ entryId, module, enabled, condition? }] }]` |
+| `GET /a2a/api/presets` | Agent-preset roster with the plugins each preset mounts: `[{ id, name?, description?, isDefault?, broken?, plugins?: [{ entryId, module, label?, hint?, enabled, condition? }] }]` |
 | `GET /a2a/api/models` | Routable model catalogue: `[{ provider, id, name }]` (empty when the host exposes no LLM service) |
 | `GET /a2a/api/update` | Plugin version and update-check answer; `?refresh=1` bypasses the cache |
 | `GET /a2a/api/card?id=<inbound>` | One inbound AgentCard; `404` when unknown |
@@ -36,7 +36,9 @@ loopback peers (`127.0.0.1`, `::1`, `::ffff:127.0.0.1`); any other peer gets
 | `GET /a2a/api/metrics` | Metrics snapshot |
 
 `GET /a2a/api/presets` answers what an A2A session will actually carry: the
-`plugins` array is the preset's composed plugin rows in declaration order.
+`plugins` array is the preset's composed plugin rows in declaration order;
+`label`/`hint` are the dashboard's friendly names for well-known modules (the
+module name itself is always present).
 `enabled` is `true`, `false`, or `'conditional'` for `!!js` rows (with the
 `condition` source); `broken` marks a preset the host could not compose. When
 the host cannot enumerate compositions the array is empty — preset selection
