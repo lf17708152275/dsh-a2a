@@ -142,6 +142,10 @@ context id。
 绝对 `http(s)` URL，末尾斜杠会被去掉；省略或留空表示继承部署级 `baseUrl` 配置。
 它只改广告地址，实际路由仍由宿主 web server 提供。
 
+特殊值 `auto` 会按每次请求的 `X-Forwarded-Host`（或 `Host`）与
+`X-Forwarded-Proto` 头推导广告地址 —— 客户端用什么地址访问，卡片就广告什么地址。
+IP 变动、多入口域名都不必重新配置；请求里没有 Host 头时回落到部署级 `baseUrl`。
+
 `inbound.sendTest` 走与线上端点相同的门禁和任务生命周期，但不走 HTTP 鉴权；
 它只能从回环调用。
 

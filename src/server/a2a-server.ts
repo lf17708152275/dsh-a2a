@@ -73,6 +73,12 @@ export interface A2AServerOptions {
   readonly onStreamClose?: (taskId: string) => void
   /** AgentCard route path for this instance; default = well-known A2A path. */
   readonly cardPath?: string
+  /**
+   * Build the AgentCard served for one request. Used by instances whose
+   * advertised base URL is dynamic (derived from the request's forwarded
+   * host), so the card reflects the address the client actually used.
+   */
+  readonly cardForRequest?: (req: ServerRequest) => AgentCard
   /** Per-task execution budget in milliseconds; 0/undefined disables it. */
   readonly taskTimeoutMs?: number
   /** Sliding-window request cap per source; 0/undefined disables it. */
@@ -214,10 +220,11 @@ export class A2AServer {
   /** Route one inbound HTTP request (GET card, POST JSON-RPC). */
   async handle(req: ServerRequest, body: string): Promise<ServerResponseSpec> {
     const path = (req.url ?? '').split('?')[0] ?? ''
+    const card = this.opts.cardForRequest?.(req) ?? this.card
     if (req.method === 'GET' && path === this.cardPath()) {
-      return { status: 200, contentType: 'application/json', body: JSON.stringify(this.card), headers: { 'A2A-Version': PROTOCOL_VERSION } }
+      return { status: 200, contentType: 'application/json', body: JSON.stringify(card), headers: { 'A2A-Version': PROTOCOL_VERSION } }
     }
-    if (req.method !== 'POST' || path !== endpointOf(this.card)) {
+    if (req.method !== 'POST' || path !== endpointOf(card)) {
       return { status: 404, contentType: 'text/plain', body: 'Not Found' }
     }
     const rejected = this.preflight(req)

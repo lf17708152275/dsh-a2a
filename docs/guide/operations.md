@@ -61,8 +61,9 @@ provider, model, bearer token and description. `workspace` (absolute path to an
 existing directory) pins that instance's agent sessions to a local project;
 `provider` and `model` pin its model selection; the advertised base URL changes
 the address written into this instance's agent card so external A2A clients call
-back through a reachable host. All four are optional and inherit the deployment
-default when left empty.
+back through a reachable host (type `auto` to derive it from each request's
+forwarded host). All four are optional and inherit the deployment default when
+left empty.
 Skills are shown after creation; you do not type them. The preset picker lists
 the real roster and preselects the deployment default.
 

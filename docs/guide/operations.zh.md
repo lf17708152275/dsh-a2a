@@ -55,7 +55,7 @@ registry 与 `package.json` 里的 GitHub 仓库，取较高版本，并如实�
 provider、model、Bearer Token 与描述。`workspace` 填已存在的绝对路径，可把该
 实例的 agent 会话固定在某个本地项目目录；`provider`/`model` 单独指定该实例用的
 模型；广告地址改的是写进该实例 Agent Card 的回连地址，方便外部客户端走反代/隧道
-访问。四者都可空，留空即继承部署默认。技能在创建后显示，
+访问（填 `auto` 则按每次请求的转发头自动推导）。四者都可空，留空即继承部署默认。技能在创建后显示，
 不需要手填。preset 选择器只列真实 roster，并预选部署默认。
 
 测试控制台选择实例、技能、可选 `contextId` 与消息，结果以任务 JSON 展示。

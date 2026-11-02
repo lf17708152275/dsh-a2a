@@ -163,6 +163,8 @@ export function validateWorkspace(raw: string | undefined): { readonly ok: true;
 export function validateBaseUrl(raw: string | undefined): { readonly ok: true; readonly value?: string } | { readonly ok: false; readonly message: string } {
   const trimmed = trimOptional(raw)
   if (trimmed === undefined) return { ok: true }
+  // `auto` derives the advertised origin from each request's forwarded host.
+  if (trimmed.toLowerCase() === 'auto') return { ok: true, value: 'auto' }
   let parsed: URL
   try {
     parsed = new URL(trimmed)
@@ -178,6 +180,31 @@ export function validateBaseUrl(raw: string | undefined): { readonly ok: true; r
 /** Per-instance advertised base URL, or the deployment default. */
 export function resolveInstanceBaseUrl(record: Pick<InboundServerRecord, 'baseUrl'>, deploymentBaseUrl: string): string {
   return record.baseUrl ?? deploymentBaseUrl
+}
+
+/** Case-insensitive header lookup on the structural request shape. */
+function requestHeader(req: { readonly headers?: Record<string, string> }, name: string): string | undefined {
+  const headers = req.headers
+  if (headers === undefined) return undefined
+  const lower = name.toLowerCase()
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === lower && typeof value === 'string') return value
+  }
+  return undefined
+}
+
+/**
+ * Derive the externally visible origin from a request (`auto` advertised base
+ * URL mode): `X-Forwarded-Host`/`Host` for the authority, `X-Forwarded-Proto`
+ * for the scheme. Returns undefined when the request carries no usable host.
+ */
+export function deriveBaseUrlFromRequest(req: { readonly headers?: Record<string, string> }): string | undefined {
+  const rawHost = requestHeader(req, 'x-forwarded-host') ?? requestHeader(req, 'host')
+  const host = rawHost?.split(',')[0]?.trim()
+  if (host === undefined || host.length === 0) return undefined
+  const rawProto = requestHeader(req, 'x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
+  const scheme = rawProto === 'https' ? 'https' : 'http'
+  return `${scheme}://${host}`
 }
 
 /** Trim an optional text override; blank collapses to undefined. */
@@ -288,8 +315,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
   const sessionCwd = resolveInstanceCwd(record, host.sessionCwd)
   const modelOverride = buildModelOverride(record)
   const tasks = new ScopedTaskStore(host.tasks, record.id)
-  const card = buildCard({
-    baseUrl: resolveInstanceBaseUrl(record, host.defaultBaseUrl),
+  const cardOptions = {
     endpointPath,
     name: record.name,
     description: record.description,
@@ -298,9 +324,20 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
     trace: traceEnabled,
     ...(authToken !== undefined ? { authToken } : {}),
     ...(host.attachments !== undefined
-      ? { inputModes: ['text/plain', 'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/octet-stream'] }
+      ? { inputModes: ['text/plain', 'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/octet-stream'] as const }
       : {}),
-  })
+  }
+  // `auto` (per instance or as the deployment default) advertises whatever
+  // origin the client reached us through (proxy headers). The static card
+  // still needs a concrete origin for the facade snapshot, so it falls back to
+  // the loopback default the host reports.
+  const configuredBaseUrl = resolveInstanceBaseUrl(record, host.defaultBaseUrl)
+  const autoBaseUrl = configuredBaseUrl === 'auto'
+  // Concrete origin for the static card when the effective mode is `auto`:
+  // the deployment default if it is concrete, else a loopback placeholder (the
+  // served card is rebuilt per request, so this only feeds facade snapshots).
+  const staticAutoFallback = host.defaultBaseUrl === 'auto' ? 'http://127.0.0.1' : host.defaultBaseUrl
+  const card = buildCard({ ...cardOptions, baseUrl: autoBaseUrl ? staticAutoFallback : configuredBaseUrl })
 
   // One preset-bound session pool per instance. The instance id is part of the
   // derived session id so two instances cannot share a DSH session just
@@ -354,6 +391,9 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
 
   const server = new A2AServer({
     card,
+    ...(autoBaseUrl
+      ? { cardForRequest: (req) => buildCard({ ...cardOptions, baseUrl: deriveBaseUrlFromRequest(req) ?? staticAutoFallback }) }
+      : {}),
     store: tasks,
     executors,
     ...(authToken !== undefined ? { authToken } : {}),

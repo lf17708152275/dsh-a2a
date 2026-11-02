@@ -170,6 +170,7 @@ export function apply(ctx: Context, config: A2AConfig) {
         logger: logger.info.bind(logger),
         listModels: () => listAvailableModels(ctx),
         modelDiagnostics: async () => (await probeModelCatalogue(ctx)).diagnostics,
+        ...(baseUrl !== undefined ? { defaultBaseUrl: baseUrl } : {}),
       })
       new A2AService(ctx, impl)
 
@@ -208,6 +209,8 @@ interface FacadeHost {
   readonly listModels?: (() => Promise<ModelOptionView[]>) | undefined
   /** Diagnostics for the catalogue probe, surfaced by `?debug=1`. */
   readonly modelDiagnostics?: (() => Promise<Record<string, unknown>>) | undefined
+  /** Deployment advertised base URL; `auto` means request-derived per instance. */
+  readonly defaultBaseUrl?: string | undefined
 }
 
 /** Facade closure over the two managers (commands and `ctx.a2a` consumers). */
@@ -216,6 +219,8 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
     const live = host.inboundManager.get(id)
     if (live === undefined) return undefined
     const r = live.record
+    const effectiveBaseUrl = r.baseUrl ?? host.defaultBaseUrl
+    const autoBaseUrl = effectiveBaseUrl === 'auto'
     return {
       id: r.id,
       name: r.name,
@@ -226,13 +231,13 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       ...(live.preset !== undefined ? { preset: live.preset } : {}),
       ...(r.authTokenEnv !== undefined ? { authTokenEnv: r.authTokenEnv } : {}),
       cardPath: live.cardPath,
-      ...(live.card.supportedInterfaces?.[0]?.url !== undefined ? { cardUrl: live.card.supportedInterfaces[0].url } : {}),
+      ...(!autoBaseUrl && live.card.supportedInterfaces?.[0]?.url !== undefined ? { cardUrl: live.card.supportedInterfaces[0].url } : {}),
       enabled: live.routes.active,
       trace: live.traceEnabled,
       ...(r.workspace !== undefined ? { workspace: r.workspace } : {}),
       ...(r.provider !== undefined ? { provider: r.provider } : {}),
       ...(r.model !== undefined ? { model: r.model } : {}),
-      ...(r.baseUrl !== undefined ? { baseUrl: r.baseUrl } : {}),
+      ...(effectiveBaseUrl !== undefined ? { baseUrl: effectiveBaseUrl } : {}),
       skills: live.skills.map((s): SkillView => ({ id: s.id, name: s.name, ...(s.description != null ? { description: s.description } : {}) })),
     }
   }

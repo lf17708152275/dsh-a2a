@@ -153,6 +153,12 @@ clients must call back through another address. It must be an absolute
 means "inherit the deployment `baseUrl` config". Only the advertised URL
 changes — the routes keep being served by the host web server.
 
+The special value `auto` derives the advertised origin from each request's
+`X-Forwarded-Host` (or `Host`) and `X-Forwarded-Proto` headers, so the card
+always advertises the address the client actually used. This survives DHCP
+changes and multiple front-door hostnames without reconfiguring the instance;
+when no host header is present the deployment `baseUrl` is the fallback.
+
 `inbound.sendTest` runs the same gate and task lifecycle as the wire endpoint
 but bypasses HTTP auth; it is only reachable on loopback.
 

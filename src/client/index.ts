@@ -685,7 +685,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                             ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'model' }, [v.provider, v.model].filter((x): x is string => x !== undefined && x.length > 0).join('/'))]
                             : []),
                           ...(v.workspace !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'ws', title: v.workspace }, 'cwd')] : []),
-                          ...(v.baseUrl !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'base', title: v.baseUrl }, 'base')] : []),
+                          ...(v.baseUrl !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'base', title: v.baseUrl === 'auto' ? '按请求自动推导广告地址' : v.baseUrl }, v.baseUrl === 'auto' ? 'base:auto' : 'base')] : []),
                           createElement('span', { className: 'dsh-a2a-auth' }, v.authTokenEnv !== undefined ? '· 已配置鉴权' : '· 匿名'),
                         ),
                         createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `${v.endpointPath} · ${v.cardUrl ?? v.cardPath}`),
@@ -724,8 +724,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
                 createElement('input', {
                   className: 'dsh-a2a-input',
                   value: inBaseUrl,
-                  placeholder: editingIn !== null ? '广告地址（留空 = 恢复部署默认）' : '广告地址（如 http://192.168.31.20，留空 = 部署默认）',
-                  title: '写进 Agent Card 的对外基地址（外部 A2A 客户端靠它回连；不含路径）',
+                  placeholder: editingIn !== null ? '广告地址（auto / URL，留空 = 恢复部署默认）' : '广告地址（auto = 按请求自动，或 http://192.168.31.20）',
+                  title: '写进 Agent Card 的对外基地址：auto = 按请求 Host 自动推导；或填 http(s)://host[:port]（不含路径）',
                   style: { flex: 1, minWidth: '280px' },
                   onChange: (e: { target: { value: string } }) => setInBaseUrl(e.target.value),
                 }),

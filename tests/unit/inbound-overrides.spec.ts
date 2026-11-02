@@ -16,6 +16,7 @@ import {
   DomainInboundStore,
   InboundServerManager,
   buildModelOverride,
+  deriveBaseUrlFromRequest,
   resolveInstanceBaseUrl,
   resolveInstanceCwd,
   validateBaseUrl,
@@ -174,11 +175,43 @@ describe('validateBaseUrl', () => {
     expect(result.message).toContain('must be an absolute URL')
   })
 
+  it('accepts the auto sentinel case-insensitively', () => {
+    expect(validateBaseUrl('auto')).toEqual({ ok: true, value: 'auto' })
+    expect(validateBaseUrl('  AUTO  ')).toEqual({ ok: true, value: 'auto' })
+  })
+
   it('rejects a non-http scheme', () => {
     const result = validateBaseUrl('ftp://192.168.31.20')
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('unreachable')
     expect(result.message).toContain('must use http or https')
+  })
+})
+
+describe('deriveBaseUrlFromRequest', () => {
+  it('prefers X-Forwarded-Host and X-Forwarded-Proto', () => {
+    expect(deriveBaseUrlFromRequest({
+      headers: { 'x-forwarded-host': 'companion.example.com', 'x-forwarded-proto': 'https', host: '127.0.0.1:25675' },
+    })).toBe('https://companion.example.com')
+  })
+
+  it('falls back to the Host header over plain http', () => {
+    expect(deriveBaseUrlFromRequest({ headers: { host: '192.168.31.20' } })).toBe('http://192.168.31.20')
+  })
+
+  it('takes the first value of a comma-joined forwarded header', () => {
+    expect(deriveBaseUrlFromRequest({
+      headers: { 'x-forwarded-host': 'edge.example.com, proxy.internal', 'x-forwarded-proto': 'https, http' },
+    })).toBe('https://edge.example.com')
+  })
+
+  it('looks headers up case-insensitively', () => {
+    expect(deriveBaseUrlFromRequest({ headers: { Host: '10.0.0.5:8080' } })).toBe('http://10.0.0.5:8080')
+  })
+
+  it('returns undefined without any host header', () => {
+    expect(deriveBaseUrlFromRequest({})).toBeUndefined()
+    expect(deriveBaseUrlFromRequest({ headers: {} })).toBeUndefined()
   })
 })
 
@@ -316,6 +349,29 @@ describe('InboundServerManager overrides', () => {
     const created = await manager.add({ ...base })
     const card = manager.get(created.id!)?.card as { supportedInterfaces?: Array<{ url?: string }> }
     expect(card.supportedInterfaces?.[0]?.url).toBe(`http://127.0.0.1:25675/a2a/${created.id}`)
+  })
+
+  it('normalizes the auto sentinel and keeps the deployment base on the static card', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, baseUrl: ' AUTO ' })
+    expect(created.ok).toBe(true)
+    expect(rows.get(created.id!)?.baseUrl).toBe('auto')
+    // Static card (facade snapshot) keeps the concrete deployment origin; the
+    // card actually served is rebuilt per request from the forwarded host.
+    const card = manager.get(created.id!)?.card as { supportedInterfaces?: Array<{ url?: string }> }
+    expect(card.supportedInterfaces?.[0]?.url).toBe(`http://127.0.0.1:25675/a2a/${created.id}`)
+  })
+
+  it('accepts auto as the deployment default', async () => {
+    const { store } = memoryStore()
+    const host = hostWith('/srv/default', {})
+    ;(host as { defaultBaseUrl: string }).defaultBaseUrl = 'auto'
+    const manager = new InboundServerManager(host, store)
+    const created = await manager.add({ ...base })
+    expect(created.ok).toBe(true)
+    const card = manager.get(created.id!)?.card as { supportedInterfaces?: Array<{ url?: string }> }
+    expect(card.supportedInterfaces?.[0]?.url).toBe(`http://127.0.0.1/a2a/${created.id}`)
   })
 
   it('refuses an update that points at a non-directory', async () => {
