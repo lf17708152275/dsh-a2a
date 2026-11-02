@@ -28,6 +28,7 @@ loopback peers (`127.0.0.1`, `::1`, `::ffff:127.0.0.1`); any other peer gets
 |---|---|
 | `GET /a2a/api` | Snapshot: `{ version, inbounds, outbounds, tasks, taskTotal, taskNextOffset, peers, sessions, metrics }` |
 | `GET /a2a/api/presets` | Agent-preset roster: `[{ id, name?, description?, isDefault? }]` |
+| `GET /a2a/api/models` | Routable model catalogue: `[{ provider, id, name }]` (empty when the host exposes no LLM service) |
 | `GET /a2a/api/update` | Plugin version and update-check answer; `?refresh=1` bypasses the cache |
 | `GET /a2a/api/card?id=<inbound>` | One inbound AgentCard; `404` when unknown |
 | `GET /a2a/api/task?id=<task>` | One task; `404` when unknown |
@@ -123,13 +124,26 @@ host exports `DSH_PROFILE`. When no source answers, the endpoint still returns
 
 | Action | Required fields | Optional fields |
 |---|---|---|
-| `inbound.create` | `name`, `description`, `version` | `endpointPath`, `preset`, `authTokenEnv`, `trace`, `enabled` |
-| `inbound.update` | `id` | `name`, `description`, `version`, `endpointPath`, `preset`, `authTokenEnv`, `trace` |
+| `inbound.create` | `name`, `description`, `version` | `endpointPath`, `preset`, `authTokenEnv`, `trace`, `enabled`, `workspace`, `provider`, `model` |
+| `inbound.update` | `id` | `name`, `description`, `version`, `endpointPath`, `preset`, `authTokenEnv`, `trace`, `workspace`, `provider`, `model` |
 | `inbound.remove` | `id` | — |
 | `inbound.enable` / `inbound.disable` | `id` | — |
 | `inbound.setAuth` | `id` | `token` (omit or empty to clear) |
 | `inbound.sendTest` | `id`, `text` | `contextId`, `skill` |
 | `inbound.close` | `id` (peer id) | — |
+
+`workspace` pins one inbound instance to a local working directory: it must be
+an absolute path to an existing directory, and it is used as the `cwd` for every
+agent session the instance opens. Omitted (or empty) means "inherit the
+deployment working directory". The value only applies when a session is
+created — contexts that already exist keep the `cwd` they were opened with, so
+switch the context id if you change it.
+
+`provider` / `model` pin one inbound instance to a specific model selection,
+overriding the deployment default for that instance only. Both fields are
+optional and independent; omitted (or empty) values fall back to the
+deployment default model. Passing an empty string on `inbound.update` clears a
+previously stored override.
 
 `inbound.sendTest` runs the same gate and task lifecycle as the wire endpoint
 but bypasses HTTP auth; it is only reachable on loopback.

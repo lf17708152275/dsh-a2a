@@ -32,6 +32,13 @@ export interface SkillView {
   readonly description?: string
 }
 
+/** One selectable model: provider plus model id, for the dashboard picker. */
+export interface ModelOptionView {
+  readonly provider: string
+  readonly id: string
+  readonly name: string
+}
+
 /** One inbound server instance, as the GUI/facade reads it. */
 export interface InboundServerView {
   readonly id: string
@@ -46,6 +53,12 @@ export interface InboundServerView {
   readonly enabled: boolean
   /** Effective trace-extension policy for this instance. */
   readonly trace: boolean
+  /** Per-instance working directory override; absent = deployment default. */
+  readonly workspace?: string
+  /** Per-instance model provider override; absent = deployment default. */
+  readonly provider?: string
+  /** Per-instance model id override; absent = deployment default. */
+  readonly model?: string
   readonly skills: readonly SkillView[]
 }
 
@@ -79,6 +92,12 @@ export interface InboundCreateInput {
   /** Allow the optional trace extension on this instance. */
   readonly trace?: boolean
   readonly enabled?: boolean
+  /** Absolute directory this instance's agent sessions start in; absent = the deployment default. */
+  readonly workspace?: string
+  /** Model provider override for this instance; absent = the deployment default. */
+  readonly provider?: string
+  /** Model id override for this instance; absent = the deployment default. */
+  readonly model?: string
 }
 
 /** Creator input for an outbound server instance. */
@@ -122,12 +141,16 @@ export interface A2AServiceImpl {
   status(): unknown
   /** Agent-preset roster for the GUI pickers. */
   presets(): Promise<PresetView[]>
+  /** Model catalogue the deployment can route to (empty when unknown). */
+  models(): Promise<ModelOptionView[]>
+  /** Why the catalogue looks the way it does; for support/debugging. */
+  modelDiagnostics(): Promise<Record<string, unknown>>
   // ── inbound server instances ────────────────────────────────────────
   listInboundServers(): InboundServerView[]
   createInboundServer(input: InboundCreateInput): Promise<OpResult>
   removeInboundServer(id: string): Promise<OpResult>
   setInboundServerEnabled(id: string, enabled: boolean): Promise<OpResult>
-  updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean }): Promise<OpResult>
+  updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string }): Promise<OpResult>
   /** Set (or clear, when token is undefined) an inbound instance's bearer token. */
   setInboundAuth(id: string, token: string | undefined): Promise<OpResult>
   /** Read an inbound instance's current AgentCard (dashboard viewer). */
@@ -183,6 +206,14 @@ export class A2AService extends Service {
     return this.impl.status()
   }
 
+  async models(): Promise<ModelOptionView[]> {
+    return this.impl.models()
+  }
+
+  async modelDiagnostics(): Promise<Record<string, unknown>> {
+    return this.impl.modelDiagnostics()
+  }
+
   async presets(): Promise<PresetView[]> {
     return this.impl.presets()
   }
@@ -203,7 +234,7 @@ export class A2AService extends Service {
     return this.impl.setInboundServerEnabled(id, enabled)
   }
 
-  async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean }): Promise<OpResult> {
+  async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string }): Promise<OpResult> {
     return this.impl.updateInboundServer(id, patch)
   }
 

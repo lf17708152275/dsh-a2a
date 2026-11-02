@@ -26,6 +26,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdirSync } from 'node:fs'
 import { openDomain, DomainTaskStore, type A2aDomain, type TaskStore } from './server/store.ts'
+import type { ModelOptionView } from './service.ts'
 import { probeService, type AgentPresetsLike, type AgentRegistryLike, type AttachmentsLike, type CredentialsLike, type SkillsLike } from './server/exec/agent-runtime.ts'
 import { aggregateSessionViews, type SessionView } from './server/session-registry.ts'
 import { A2aMetrics } from './server/metrics.ts'
@@ -159,7 +160,17 @@ export function apply(ctx: Context, config: A2AConfig) {
       outboundManager.boot()
 
       // ── service facade + commands + GUI API ───────────────────────────
-      const impl: A2AServiceImpl = makeFacade({ domain, store, inboundManager, outboundManager, agentPresets, metrics, logger: logger.info.bind(logger) })
+      const impl: A2AServiceImpl = makeFacade({
+        domain,
+        store,
+        inboundManager,
+        outboundManager,
+        agentPresets,
+        metrics,
+        logger: logger.info.bind(logger),
+        listModels: () => listAvailableModels(ctx),
+        modelDiagnostics: async () => (await probeModelCatalogue(ctx)).diagnostics,
+      })
       new A2AService(ctx, impl)
 
       if (commandsRef !== undefined) {
@@ -193,6 +204,10 @@ interface FacadeHost {
   readonly metrics: A2aMetrics
   readonly agentPresets?: (AgentPresetsLike & { list(): Promise<Array<{ id: string; name?: string; description?: string }>>; readonly defaultId?: string }) | undefined
   readonly logger: (message: string) => void
+  /** Model catalogue of the deployment (empty when the host has no LLM service). */
+  readonly listModels?: (() => Promise<ModelOptionView[]>) | undefined
+  /** Diagnostics for the catalogue probe, surfaced by `?debug=1`. */
+  readonly modelDiagnostics?: (() => Promise<Record<string, unknown>>) | undefined
 }
 
 /** Facade closure over the two managers (commands and `ctx.a2a` consumers). */
@@ -214,6 +229,9 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       ...(live.card.supportedInterfaces?.[0]?.url !== undefined ? { cardUrl: live.card.supportedInterfaces[0].url } : {}),
       enabled: live.routes.active,
       trace: live.traceEnabled,
+      ...(r.workspace !== undefined ? { workspace: r.workspace } : {}),
+      ...(r.provider !== undefined ? { provider: r.provider } : {}),
+      ...(r.model !== undefined ? { model: r.model } : {}),
       skills: live.skills.map((s): SkillView => ({ id: s.id, name: s.name, ...(s.description != null ? { description: s.description } : {}) })),
     }
   }
@@ -269,6 +287,20 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
         sessions: sessionViews(),
       }
     },
+    async models(): Promise<ModelOptionView[]> {
+      try {
+        return (await host.listModels?.()) ?? []
+      } catch {
+        return []
+      }
+    },
+    async modelDiagnostics(): Promise<Record<string, unknown>> {
+      try {
+        return (await host.modelDiagnostics?.()) ?? { reason: 'no diagnostics hook' }
+      } catch (err) {
+        return { reason: `diagnostics threw: ${(err as Error).message}` }
+      }
+    },
     async presets(): Promise<PresetView[]> {
       if (host.agentPresets === undefined) return []
       const defaultId = host.agentPresets.defaultId
@@ -297,6 +329,9 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
         ...(input.authTokenEnv !== undefined ? { authTokenEnv: input.authTokenEnv } : {}),
         ...(input.trace !== undefined ? { trace: input.trace } : {}),
         ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+        ...(input.workspace !== undefined ? { workspace: input.workspace } : {}),
+        ...(input.provider !== undefined ? { provider: input.provider } : {}),
+        ...(input.model !== undefined ? { model: input.model } : {}),
       })
       host.logger(`[a2a] inbound created: ${result.message}`)
       audit('inbound.create', result.message, result.id)
@@ -312,7 +347,7 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       audit('inbound.enable', result.message, id)
       return result
     },
-    async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean }): Promise<OpResult> {
+    async updateInboundServer(id: string, patch: { name?: string; description?: string; version?: string; endpointPath?: string; preset?: string; authTokenEnv?: string; trace?: boolean; workspace?: string; provider?: string; model?: string }): Promise<OpResult> {
       const result = await host.inboundManager.update(id, patch)
       audit('inbound.update', result.message, id)
       return result
@@ -452,6 +487,77 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       }
       return { ok: false, message: `inbound peer ${peerId} not found` }
     },
+  }
+}
+
+/** Locate the host `llm` service through reflection or a plain property read. */
+function probeLlm(ctx: Context): { llm: unknown; via: 'reflect' | 'property' | 'none' } {
+  const svc = probeService(ctx, 'llm', 'listProviders') ?? probeService(ctx, 'llm', 'listModels')
+  if (svc !== undefined) return { llm: svc, via: 'reflect' }
+  const direct = (ctx as unknown as { llm?: unknown }).llm
+  if (direct !== undefined && direct !== null) return { llm: direct, via: 'property' }
+  return { llm: undefined, via: 'none' }
+}
+
+interface CatalogueProbe {
+  readonly rows: ModelOptionView[]
+  readonly diagnostics: Record<string, unknown>
+}
+
+/** Enumerate the models the deployment can actually route to (best effort). */
+async function probeModelCatalogue(ctx: Context): Promise<CatalogueProbe> {
+  const { llm, via } = probeLlm(ctx)
+  const diagnostics: Record<string, unknown> = { service: via }
+  if (llm === undefined || llm === null) {
+    return { rows: [], diagnostics: { ...diagnostics, reason: 'llm service not found on ctx' } }
+  }
+  const svc = llm as {
+    listProviders?(): Promise<readonly unknown[]> | readonly unknown[]
+    listModels?(provider: string): Promise<readonly { provider: string; id: string; name: string }[]>
+  }
+  diagnostics.listProviders = typeof svc.listProviders === 'function'
+  diagnostics.listModels = typeof svc.listModels === 'function'
+  if (typeof svc.listModels !== 'function') {
+    return { rows: [], diagnostics: { ...diagnostics, reason: 'llm service has no listModels()' } }
+  }
+  let providers: readonly unknown[] = []
+  try {
+    providers = (await svc.listProviders?.()) ?? []
+  } catch (err) {
+    return { rows: [], diagnostics: { ...diagnostics, reason: `listProviders threw: ${(err as Error).message}` } }
+  }
+  diagnostics.providers = providers.map((raw) => providerIdOf(raw) ?? `?${JSON.stringify(raw)}`)
+  const rows: ModelOptionView[] = []
+  const failures: string[] = []
+  for (const raw of providers) {
+    const provider = providerIdOf(raw)
+    if (provider === undefined) continue
+    try {
+      for (const model of await svc.listModels(provider)) {
+        rows.push({ provider: model.provider, id: model.id, name: model.name })
+      }
+    } catch (err) {
+      failures.push(`${provider}: ${(err as Error).message}`)
+    }
+  }
+  if (failures.length > 0) diagnostics.failures = failures
+  diagnostics.rows = rows.length
+  return { rows, diagnostics }
+}
+
+function providerIdOf(raw: unknown): string | undefined {
+  if (typeof raw === 'string') return raw
+  const row = raw as { id?: unknown; provider?: unknown }
+  if (typeof row.id === 'string') return row.id
+  if (typeof row.provider === 'string') return row.provider
+  return undefined
+}
+
+async function listAvailableModels(ctx: Context): Promise<ModelOptionView[]> {
+  try {
+    return (await probeModelCatalogue(ctx)).rows
+  } catch {
+    return []
   }
 }
 

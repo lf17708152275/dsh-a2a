@@ -241,7 +241,9 @@ export class ContextSessionPool {
     try {
       return await this.agents.create(createOptions)
     } catch (err) {
-      if (/already (has|owns)|persisted/i.test((err as Error).message)) {
+      // DSH raises `session "x" already exists` / `... is already owned by an
+      // active write handle`; both must resume, not fail the task.
+      if (/already (has|owns|exists|owned)|persisted/i.test((err as Error).message)) {
         return await this.agents.resume({ resumeSessionId: sessionId, ...withModel, ...(setup ? { setup } : {}) })
       }
       throw err

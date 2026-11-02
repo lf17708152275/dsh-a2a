@@ -63,6 +63,9 @@ export interface InboundServerView {
   readonly cardUrl?: string
   readonly enabled: boolean
   readonly trace: boolean
+  readonly workspace?: string
+  readonly provider?: string
+  readonly model?: string
   readonly skills: readonly SkillView[]
 }
 
@@ -212,6 +215,41 @@ async function fetchPresets(): Promise<PresetView[]> {
   return (await res.json()) as PresetView[]
 }
 
+/** One routable model as reported by the host's model catalogue. */
+interface ModelOption {
+  readonly provider: string
+  readonly id: string
+  readonly name: string
+}
+
+async function fetchModels(): Promise<ModelOption[]> {
+  try {
+    const res = await fetch('/a2a/api/models', { headers: { accept: 'application/json' } })
+    if (!res.ok) return []
+    const rows = (await res.json()) as unknown
+    if (!Array.isArray(rows)) return []
+    return rows.filter((r): r is ModelOption => {
+      const row = r as { provider?: unknown; id?: unknown; name?: unknown }
+      return typeof row.provider === 'string' && typeof row.id === 'string'
+    })
+  } catch {
+    return []
+  }
+}
+
+/** Dropdown value for "provider/id", or '' when the instance inherits the default. */
+function modelKey(provider: string | undefined, model: string | undefined): string {
+  if (provider === undefined || provider === '') return ''
+  if (model === undefined || model === '') return ''
+  return `${provider}/${model}`
+}
+
+function splitModelKey(key: string): { provider: string; model: string } {
+  const at = key.indexOf('/')
+  if (at <= 0) return { provider: '', model: '' }
+  return { provider: key.slice(0, at), model: key.slice(at + 1) }
+}
+
 async function fetchUpdate(force = false): Promise<UpdateInfo> {
   const res = await fetch(`/a2a/api/update${force ? '?refresh=1' : ''}`, { headers: { accept: 'application/json' } })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -272,6 +310,10 @@ export function A2aSection(_props: SectionProps): ReactElement {
   const [inToken, setInToken] = useState('')
   const [inClearAuth, setInClearAuth] = useState(false)
   const [inTrace, setInTrace] = useState(false)
+  // Per-instance workspace + model overrides (blank = inherit deployment default).
+  const [inWorkspace, setInWorkspace] = useState('')
+  const [models, setModels] = useState<readonly ModelOption[]>([])
+  const [inModelKey, setInModelKey] = useState('')
 
   // Outbound add/edit form (two-phase).
   const [editingOut, setEditingOut] = useState<string | null>(null)
@@ -289,13 +331,15 @@ export function A2aSection(_props: SectionProps): ReactElement {
     let alive = true
     const tick = async (): Promise<void> => {
       try {
-        const [next, presetRows] = await Promise.all([
+        const [next, presetRows, modelRows] = await Promise.all([
           fetchSnapshot({ taskLimit, ...(taskFilter !== '' ? { taskState: taskFilter } : {}) }),
           fetchPresets(),
+          fetchModels(),
         ])
         if (alive) {
           setSnap(next)
           setPresets(presetRows)
+          setModels(modelRows)
           // Default an unset preset picker to the deployment default (if any).
           const def = presetRows.find((p) => p.isDefault)?.id
           setInPreset((current) => current === '' && def !== undefined ? def : current)
@@ -407,6 +451,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInToken('')
     setInClearAuth(false)
     setInTrace(false)
+    setInWorkspace('')
+    setInModelKey('')
   }
 
   const beginEditInbound = (v: InboundServerView): void => {
@@ -418,6 +464,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInToken('')
     setInClearAuth(false)
     setInTrace(v.trace)
+    setInWorkspace(v.workspace ?? '')
+    setInModelKey(modelKey(v.provider, v.model))
   }
 
   const submitInbound = async (): Promise<void> => {
@@ -428,6 +476,10 @@ export function A2aSection(_props: SectionProps): ReactElement {
       version: inVersion.trim() || '1.0.0',
       ...(inPreset !== '' ? { preset: inPreset } : {}),
       trace: inTrace,
+      // Blank clears the override (update) / inherits the default (create).
+      workspace: inWorkspace.trim(),
+      provider: splitModelKey(inModelKey).provider,
+      model: splitModelKey(inModelKey).model,
     }
     const done = editingIn === null
       ? await control({ action: 'inbound.create', ...base })
@@ -623,9 +675,16 @@ export function A2aSection(_props: SectionProps): ReactElement {
                           createElement('span', { className: 'dsh-a2a-badge' }, presetLabel(presets, v.preset)),
                           createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono' }, `v${v.version}`),
                           ...(v.trace ? [createElement('span', { className: 'dsh-a2a-badge', key: 'trace' }, 'trace')] : []),
+                          ...(v.model !== undefined || v.provider !== undefined
+                            ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'model' }, [v.provider, v.model].filter((x): x is string => x !== undefined && x.length > 0).join('/'))]
+                            : []),
+                          ...(v.workspace !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'ws', title: v.workspace }, 'cwd')] : []),
                           createElement('span', { className: 'dsh-a2a-auth' }, v.authTokenEnv !== undefined ? '· 已配置鉴权' : '· 匿名'),
                         ),
                         createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `${v.endpointPath} · ${v.cardUrl ?? v.cardPath}`),
+                        v.workspace !== undefined
+                          ? createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `cwd: ${v.workspace}`)
+                          : null,
                         v.skills.length > 0
                           ? createElement('div', null, ...v.skills.map((s) => createElement('span', { className: 'dsh-a2a-skill', key: s.id, title: s.description ?? '' }, s.name)))
                           : null,
@@ -647,6 +706,30 @@ export function A2aSection(_props: SectionProps): ReactElement {
                 createElement('input', { className: 'dsh-a2a-input', value: inVersion, placeholder: '版本', style: { width: '76px' }, onChange: (e: { target: { value: string } }) => setInVersion(e.target.value) }),
                 createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value) },
                   ...presets.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, p.name ?? p.id)),
+                ),
+                createElement('input', {
+                  className: 'dsh-a2a-input',
+                  value: inWorkspace,
+                  placeholder: editingIn !== null ? '工作空间绝对路径（留空 = 恢复默认 ~/.dsh/a2a-sessions）' : '工作空间绝对路径（可选，留空 = 默认 ~/.dsh/a2a-sessions）',
+                  style: { flex: 1, minWidth: '280px' },
+                  onChange: (e: { target: { value: string } }) => setInWorkspace(e.target.value),
+                }),
+                createElement('select', {
+                  className: 'dsh-a2a-select',
+                  value: inModelKey,
+                  title: '该入站实例使用的模型（留空 = 继承部署默认）',
+                  style: { width: '260px' },
+                  onChange: (e: { target: { value: string } }) => setInModelKey(e.target.value),
+                },
+                  createElement('option', { value: '', key: '' }, '模型：继承部署默认'),
+                  ...models.map((m) => createElement('option', {
+                    value: modelKey(m.provider, m.id),
+                    key: modelKey(m.provider, m.id),
+                    title: `${m.provider} / ${m.id}`,
+                  }, `${m.name}（${m.provider}/${m.id}）`)),
+                  ...(inModelKey !== '' && !models.some((m) => modelKey(m.provider, m.id) === inModelKey)
+                    ? [createElement('option', { value: inModelKey, key: `custom:${inModelKey}` }, `已配置：${inModelKey}`)]
+                    : []),
                 ),
                 createElement('input', { className: 'dsh-a2a-input', type: 'password', value: inToken, placeholder: editingIn !== null ? 'Bearer Token（留空不改，填写则更新）' : 'Bearer Token（可选）', onChange: (e: { target: { value: string } }) => setInToken(e.target.value) }),
                 createElement('label', { className: 'dsh-a2a-hint' },

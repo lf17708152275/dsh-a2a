@@ -146,3 +146,11 @@ vite.config.ts.timestamp-*
 # provided by the host composition). The standalone pnpm lockfile IS committed
 # so CI can install with --frozen-lockfile and reproduce the toolchain.
 lib/
+
+# local-only dev scaffolding (scratch verification scripts, never published)
+scripts/local/
+# local-only tsconfig/tsdown/vitest shims used when the sibling harness
+# checkout is absent; the committed configs are the source of truth.
+tsconfig.local.json
+tsdown.local.config.ts
+vitest.local.config.ts

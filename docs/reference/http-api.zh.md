@@ -27,6 +27,7 @@ update-time: 2026-10-25
 |---|---|
 | `GET /a2a/api` | 快照：`{ version, inbounds, outbounds, tasks, taskTotal, taskNextOffset, peers, sessions, metrics }` |
 | `GET /a2a/api/presets` | Agent preset 名单：`[{ id, name?, description?, isDefault? }]` |
+| `GET /a2a/api/models` | 可路由模型清单：`[{ provider, id, name }]`（宿主没有 LLM 服务时返回空数组） |
 | `GET /a2a/api/update` | 插件版本与更新检查结果；`?refresh=1` 跳过缓存 |
 | `GET /a2a/api/card?id=<inbound>` | 一个入站 AgentCard；未知 id 返回 `404` |
 | `GET /a2a/api/task?id=<task>` | 一条任务；未知 id 返回 `404` |
@@ -118,13 +119,22 @@ reasoning block；它不是 A2A 线协议的一部分，也不会通过 A2A 暴�
 
 | 动作 | 必填字段 | 可选字段 |
 |---|---|---|
-| `inbound.create` | `name`、`description`、`version` | `endpointPath`、`preset`、`authTokenEnv`、`trace`、`enabled` |
-| `inbound.update` | `id` | `name`、`description`、`version`、`endpointPath`、`preset`、`authTokenEnv`、`trace` |
+| `inbound.create` | `name`、`description`、`version` | `endpointPath`、`preset`、`authTokenEnv`、`trace`、`enabled`、`workspace`、`provider`、`model` |
+| `inbound.update` | `id` | `name`、`description`、`version`、`endpointPath`、`preset`、`authTokenEnv`、`trace`、`workspace`、`provider`、`model` |
 | `inbound.remove` | `id` | — |
 | `inbound.enable` / `inbound.disable` | `id` | — |
 | `inbound.setAuth` | `id` | `token`（省略或空串即清除） |
 | `inbound.sendTest` | `id`、`text` | `contextId`、`skill` |
 | `inbound.close` | `id`（对端 id） | — |
+
+`workspace` 把单个入站实例固定到本地某个工作目录：必须是已存在的绝对路径，
+该实例打开的所有 agent 会话都以它为 `cwd`。省略或留空表示继承部署级工作目录。
+该值只在**创建会话时**生效——已存在的 context 仍留在当初的 `cwd`，要换目录需换
+context id。
+
+`provider` / `model` 为单个入站实例固定模型选择，只覆盖该实例而不影响部署默认。
+两字段相互独立，省略或留空即回落到部署默认模型；在 `inbound.update` 里传空串
+可清除此前保存的覆盖值。
 
 `inbound.sendTest` 走与线上端点相同的门禁和任务生命周期，但不走 HTTP 鉴权；
 它只能从回环调用。

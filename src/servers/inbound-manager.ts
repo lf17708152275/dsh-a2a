@@ -18,6 +18,8 @@
  * @module dsh-a2a/servers/inbound-manager
  */
 
+import { statSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { buildCard } from '../server/card.ts'
 import { A2AServer } from '../server/a2a-server.ts'
@@ -77,6 +79,11 @@ export interface InboundManagerHost {
   readonly newId: () => string
 }
 
+/** Effective per-instance working directory: record override, else deployment default. */
+export function resolveInstanceCwd(record: Pick<InboundServerRecord, 'workspace'>, deploymentCwd: string): string {
+  return record.workspace ?? deploymentCwd
+}
+
 /** One live inbound instance's runtime handle. */
 export interface LiveInboundServer {
   readonly id: string
@@ -114,6 +121,49 @@ export interface InboundCreateInput {
   /** Allow the optional trace extension on this instance (default from config). */
   readonly trace?: boolean
   readonly enabled?: boolean
+  /**
+   * Absolute working directory for this instance's agent sessions. Absent (or
+   * blank) = the deployment default. Only affects sessions created afterwards.
+   */
+  readonly workspace?: string
+  /** Model provider override for this instance; absent = deployment default. */
+  readonly provider?: string
+  /** Model id override for this instance; absent = deployment default. */
+  readonly model?: string
+}
+
+/** Validate an optional per-instance workspace override (absolute + existing dir). */
+export function validateWorkspace(raw: string | undefined): { readonly ok: true; readonly value?: string } | { readonly ok: false; readonly message: string } {
+  if (raw === undefined) return { ok: true }
+  const trimmed = raw.trim()
+  if (trimmed.length === 0) return { ok: true }
+  if (!isAbsolute(trimmed)) return { ok: false, message: `workspace must be an absolute path: ${trimmed}` }
+  try {
+    if (!statSync(trimmed).isDirectory()) {
+      return { ok: false, message: `workspace is not a directory: ${trimmed}` }
+    }
+  } catch {
+    return { ok: false, message: `workspace does not exist: ${trimmed}` }
+  }
+  return { ok: true, value: trimmed }
+}
+
+/** Trim an optional text override; blank collapses to undefined. */
+export function trimOptional(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+/** Per-instance model override, or undefined when the instance inherits the default. */
+export function buildModelOverride(record: InboundServerRecord): { readonly provider?: string; readonly model?: string } | undefined {
+  const provider = trimOptional(record.provider)
+  const model = trimOptional(record.model)
+  if (provider === undefined && model === undefined) return undefined
+  return {
+    ...(provider !== undefined ? { provider } : {}),
+    ...(model !== undefined ? { model } : {}),
+  }
 }
 
 export interface OpResult {
@@ -202,6 +252,9 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
   const cardPath = `${endpointPath.replace(/\/$/, '')}/agent-card.json`
   const preset = record.preset ?? host.defaultPresetId
   const traceEnabled = host.inboundTrace && (record.trace ?? host.inboundTrace)
+  // Per-instance workspace/model overrides (additive: absent = deployment default).
+  const sessionCwd = resolveInstanceCwd(record, host.sessionCwd)
+  const modelOverride = buildModelOverride(record)
   const tasks = new ScopedTaskStore(host.tasks, record.id)
   const card = buildCard({
     baseUrl: host.defaultBaseUrl,
@@ -223,7 +276,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
   const sessions = new ContextSessionRegistry()
   const sessionPool = host.agents
     ? new ContextSessionPool(host.agents, {
-      cwd: host.sessionCwd,
+      cwd: sessionCwd,
       sessionNamespace: record.id,
       ...(host.agentPresets !== undefined ? { agentPresets: host.agentPresets } : {}),
       ...(preset !== undefined ? { presetId: () => preset } : {}),
@@ -231,7 +284,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
       // `?.()` yields `{ provider?, model? } | undefined`, matching the
       // AgentRuntimeOptions.resolveAgentOptions signature under
       // exactOptionalPropertyTypes.
-      resolveAgentOptions: () => host.resolveDefaultModel?.(),
+      resolveAgentOptions: () => modelOverride ?? host.resolveDefaultModel?.(),
       // First open of a context's session: persist the contextId → sessionId
       // binding so the durable store agrees with the pool. The scoped store
       // namespaces the binding by inbound instance. The write is memory-first
@@ -410,6 +463,10 @@ export class InboundServerManager {
   async add(input: InboundCreateInput): Promise<OpResult & { readonly id?: string }> {
     const id = this.newId(input.name)
     if (this.live.has(id)) return { ok: false, message: `inbound server ${id} already exists` }
+    const workspace = validateWorkspace(input.workspace)
+    if (!workspace.ok) return { ok: false, message: workspace.message }
+    const provider = trimOptional(input.provider)
+    const model = trimOptional(input.model)
     const preset = input.preset ?? this.host.defaultPresetId
     const record: InboundServerRecord = {
       id,
@@ -420,6 +477,9 @@ export class InboundServerManager {
       ...(preset !== undefined ? { preset } : {}),
       ...(input.authTokenEnv !== undefined ? { authTokenEnv: input.authTokenEnv } : {}),
       ...(input.trace !== undefined ? { trace: input.trace } : {}),
+      ...(workspace.value !== undefined ? { workspace: workspace.value } : {}),
+      ...(provider !== undefined ? { provider } : {}),
+      ...(model !== undefined ? { model } : {}),
       enabled: input.enabled ?? true,
     }
     try {
@@ -436,12 +496,22 @@ export class InboundServerManager {
   }
 
   /** Persist, rebuild (re-deriving skills), and apply a patch onto a live instance. */
-  async update(id: string, patch: Partial<Pick<InboundServerRecord, 'name' | 'description' | 'version' | 'endpointPath' | 'preset' | 'authTokenEnv' | 'trace'>>): Promise<OpResult> {
+  async update(id: string, patch: Partial<Pick<InboundServerRecord, 'name' | 'description' | 'version' | 'endpointPath' | 'preset' | 'authTokenEnv' | 'trace' | 'workspace' | 'provider' | 'model'>>): Promise<OpResult> {
     const live = this.live.get(id)
     const stored = this.store.get(id)
     if (live === undefined || stored === undefined) return { ok: false, message: `inbound server ${id} not found` }
+    if (patch.workspace !== undefined) {
+      const workspace = validateWorkspace(patch.workspace)
+      if (!workspace.ok) return { ok: false, message: workspace.message }
+    }
+    // Overrides are additive and clearable: an explicit blank string removes the
+    // override so the instance falls back to the deployment default again.
+    const { workspace: _dropWs, provider: _dropProv, model: _dropModel, ...base } = stored
+    const nextWorkspace = patch.workspace !== undefined ? trimOptional(patch.workspace) : stored.workspace
+    const nextProvider = patch.provider !== undefined ? trimOptional(patch.provider) : stored.provider
+    const nextModel = patch.model !== undefined ? trimOptional(patch.model) : stored.model
     const next: InboundServerRecord = {
-      ...stored,
+      ...base,
       name: patch.name ?? stored.name,
       description: patch.description ?? stored.description,
       version: patch.version ?? stored.version,
@@ -449,6 +519,9 @@ export class InboundServerManager {
       ...(patch.preset !== undefined ? { preset: patch.preset } : {}),
       ...(patch.authTokenEnv !== undefined ? { authTokenEnv: patch.authTokenEnv } : {}),
       ...(patch.trace !== undefined ? { trace: patch.trace } : {}),
+      ...(nextWorkspace !== undefined ? { workspace: nextWorkspace } : {}),
+      ...(nextProvider !== undefined ? { provider: nextProvider } : {}),
+      ...(nextModel !== undefined ? { model: nextModel } : {}),
       enabled: stored.enabled,
     }
     try {

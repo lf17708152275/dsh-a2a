@@ -51,7 +51,10 @@ registry 与 `package.json` 里的 GitHub 仓库，取较高版本，并如实�
 | **删除** | dispose 活实例并删除持久化记录 |
 | **清除鉴权** | 仅已配置鉴权的实例出现；删除已存 token 并以匿名实例重建 |
 
-创建/编辑表单有名称、版本、preset、Bearer Token 与描述。技能在创建后显示，
+创建/编辑表单有名称、版本、preset、工作空间(workspace)、provider、model、
+Bearer Token 与描述。`workspace` 填已存在的绝对路径，可把该实例的 agent 会话
+固定在某个本地项目目录；`provider`/`model` 单独指定该实例用的模型。三者都可空，
+留空即继承部署默认。技能在创建后显示，
 不需要手填。preset 选择器只列真实 roster，并预选部署默认。
 
 测试控制台选择实例、技能、可选 `contextId` 与消息，结果以任务 JSON 展示。

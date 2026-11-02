@@ -76,6 +76,16 @@ export interface InboundServerRecord {
   readonly enabled: boolean
   /** Instance policy for the optional trace extension (global config is a hard gate). */
   readonly trace?: boolean
+  /**
+   * Per-instance working directory for inbound agent sessions. Absent = the
+   * deployment default (`<DSH_HOME>/a2a-sessions`). Applied when a session is
+   * created, so changing it never rewrites the cwd of already-open contexts.
+   */
+  readonly workspace?: string
+  /** Per-instance model provider override; absent = the deployment default. */
+  readonly provider?: string
+  /** Per-instance model id override; absent = the deployment default. */
+  readonly model?: string
 }
 
 /** One durable outbound server connection instance. */
