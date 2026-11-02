@@ -95,12 +95,24 @@ export interface OutboundServerView {
   readonly lastCardAt?: string
 }
 
+/** One plugin row of the preset an inbound session will mount. */
+export interface PresetPluginView {
+  readonly entryId: string | null
+  readonly module: string
+  readonly enabled: boolean | 'conditional'
+  readonly condition?: string
+}
+
 export interface PresetView {
   readonly id: string
   readonly name?: string
   readonly description?: string
   /** Whether this preset is the deployment default when none is named. */
   readonly isDefault?: boolean
+  /** The host could not compose this preset. */
+  readonly broken?: boolean
+  /** Plugins a session started from this preset carries, in declaration order. */
+  readonly plugins?: readonly PresetPluginView[]
 }
 
 export interface ApiSnapshot {
@@ -289,6 +301,20 @@ function dotState(state: string): string {
 function presetLabel(presets: readonly PresetView[], id: string | undefined): string {
   if (id === undefined) return '—'
   return presets.find((p) => p.id === id)?.name ?? id
+}
+
+/** How many plugins a session started from this preset mounts. */
+export function mountedPluginCount(preset: PresetView | undefined): number {
+  if (preset === undefined) return 0
+  return (preset.plugins ?? []).filter((plugin) => plugin.enabled !== false).length
+}
+
+/** Human label for one plugin row. */
+export function pluginLabel(plugin: PresetPluginView): string {
+  const short = plugin.module.replace(/^@deepseek-ai\//, '')
+  if (plugin.enabled === false) return `${short}（已关闭）`
+  if (plugin.enabled === 'conditional') return `${short}（条件：${plugin.condition ?? '?'}）`
+  return short
 }
 
 type SectionProps = PropsRuntime<'settings.section'>
@@ -759,6 +785,13 @@ export function A2aSection(_props: SectionProps): ReactElement {
                           createElement('span', { 'data-state': v.enabled ? 'connected' : 'disabled', className: 'dsh-a2a-dot' }),
                           createElement('span', { className: 'dsh-a2a-card-name' }, v.name),
                           createElement('span', { className: 'dsh-a2a-badge', title: v.presetOverride === undefined ? '跟随部署默认预设' : `预设 ${v.presetOverride}` }, v.presetOverride === undefined ? `默认·${presetLabel(presets, v.preset)}` : presetLabel(presets, v.preset)),
+                          (() => {
+                            const preset = presets.find((p) => p.id === v.preset)
+                            const count = mountedPluginCount(preset)
+                            return count === 0
+                              ? null
+                              : createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'caps', title: '该预设会话携带的插件数量' }, `${count} 项能力`)
+                          })(),
                           createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono' }, `v${v.version}`),
                           ...(v.trace ? [createElement('span', { className: 'dsh-a2a-badge', key: 'trace' }, 'trace')] : []),
                           ...(v.model !== undefined || v.provider !== undefined
@@ -792,8 +825,27 @@ export function A2aSection(_props: SectionProps): ReactElement {
                 createElement('input', { className: 'dsh-a2a-input', value: inVersion, placeholder: '版本', style: { width: '76px' }, onChange: (e: { target: { value: string } }) => setInVersion(e.target.value) }),
                 createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value), title: '绑定这个端点使用的 Agent 预设；选「默认」= 跟随部署默认预设' },
                   createElement('option', { value: '', key: '__default__' }, '（默认：跟随部署）'),
-                  ...presets.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, p.name ?? p.id)),
+                  ...presets.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, `${p.name ?? p.id}（${mountedPluginCount(p)} 项能力）`)),
                 ),
+                (() => {
+                  const activePreset = presets.find((p) => p.id === inPreset) ?? presets.find((p) => p.isDefault === true)
+                  if (activePreset === undefined) return null
+                  const plugins = activePreset.plugins ?? []
+                  return createElement('details', { className: 'dsh-a2a-hint', style: { flexBasis: '100%', margin: '2px 0 4px' } },
+                    createElement('summary', { style: { cursor: 'pointer' } },
+                      `该预设的 A2A 会话会携带 ${mountedPluginCount(activePreset)} 个插件${plugins.length > mountedPluginCount(activePreset) ? `（声明 ${plugins.length} 行）` : ''} · ${activePreset.name ?? activePreset.id}`,
+                    ),
+                    plugins.length === 0
+                      ? createElement('div', { className: 'dsh-a2a-hint' }, '宿主没有提供这个预设的插件清单（预设仍可用，只是不能在这里预读）。')
+                      : createElement('div', { style: { marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+                          ...plugins.map((plugin, i) => createElement('span', {
+                            className: 'dsh-a2a-skill',
+                            key: `${plugin.module}:${plugin.entryId ?? i}`,
+                            title: plugin.enabled === 'conditional' ? `条件表达式：${plugin.condition ?? '?'}` : (plugin.enabled ? '启用' : '已关闭'),
+                          }, pluginLabel(plugin))),
+                        ),
+                  )
+                })(),
                 createElement('input', {
                   className: 'dsh-a2a-input',
                   value: inWorkspace,

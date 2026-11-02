@@ -39,6 +39,7 @@ import { A2AService, type A2AServiceImpl, type DeploymentSettingsView, type Inbo
 import { buildA2aCommand } from './commands.ts'
 import { InboundServerManager, DomainInboundStore, resolveAuthToken, validateBaseUrl, type InboundManagerHost, type WebServerLike as InboundWebServerLike } from './servers/inbound-manager.ts'
 import { readDeploymentSettings, writeDeploymentSettings, type DeploymentSettingsRecord } from './server/settings.ts'
+import { presetCapabilities, type CompositionLike } from './server/preset-capabilities.ts'
 import { discoverBaseUrlCandidates } from './server/net.ts'
 import { adoptSessions, registerDefaultWorkspace, type WorkspaceAttachLike, type WorkspaceCreatorLike, type WorkspaceRegistrationStatus } from './server/default-workspace.ts'
 import { OutboundServerManager, DomainOutboundStore, type OutboundManagerHost, type OutboundServerView } from './servers/outbound-manager.ts'
@@ -115,7 +116,7 @@ export function apply(ctx: Context, config: A2AConfig) {
         | undefined
       const agents = probeService(ctx, 'agents', 'create') as AgentRegistryLike | undefined
       const agentPresets = probeService(ctx, 'agentPresets', 'list') as
-        | (AgentPresetsLike & { list(): Promise<Array<{ id: string; name?: string; description?: string }>>; readonly defaultId?: string })
+        | (AgentPresetsLike & AgentPresetRosterHost)
         | undefined
       const skills = probeService(ctx, 'skills', 'list') as SkillsLike | undefined
       const credentials = probeService(ctx, 'credentials', 'resolve') as CredentialsLike | undefined
@@ -340,13 +341,21 @@ export function apply(ctx: Context, config: A2AConfig) {
   })
 }
 
+/** The part of the host agent-preset registry the dashboard reads. */
+export interface AgentPresetRosterHost {
+  list(): Promise<Array<{ id: string; name?: string; description?: string }>>
+  /** Declaration rows + activation state for every registered preset. */
+  compositionInventory?(): Promise<readonly CompositionLike[]>
+  readonly defaultId?: string
+}
+
 interface FacadeHost {
   readonly domain: A2aDomain
   readonly store: TaskStore
   readonly inboundManager: InboundServerManager
   readonly outboundManager: OutboundServerManager
   readonly metrics: A2aMetrics
-  readonly agentPresets?: (AgentPresetsLike & { list(): Promise<Array<{ id: string; name?: string; description?: string }>>; readonly defaultId?: string }) | undefined
+  readonly agentPresets?: (AgentPresetsLike & AgentPresetRosterHost) | undefined
   readonly logger: (message: string) => void
   /** Model catalogue of the deployment (empty when the host has no LLM service). */
   readonly listModels?: (() => Promise<ModelOptionView[]>) | undefined
@@ -486,16 +495,34 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
     async presets(): Promise<PresetView[]> {
       if (host.agentPresets === undefined) return []
       const defaultId = host.agentPresets.defaultId
+      let rows: Array<{ id: string; name?: string; description?: string }>
       try {
-        return (await host.agentPresets.list()).map((p) => ({
-          id: p.id,
-          ...(p.name !== undefined ? { name: p.name } : {}),
-          ...(p.description !== undefined ? { description: p.description } : {}),
-          ...(defaultId !== undefined && p.id === defaultId ? { isDefault: true } : {}),
-        }))
+        rows = await host.agentPresets.list()
       } catch {
         return []
       }
+      let compositions: readonly CompositionLike[] | undefined
+      if (host.agentPresets.compositionInventory !== undefined) {
+        try {
+          compositions = await host.agentPresets.compositionInventory()
+        } catch {
+          // Capability display is additive: a host that cannot enumerate its
+          // compositions still gets a usable preset picker.
+          compositions = undefined
+        }
+      }
+      const capabilities = presetCapabilities(rows, compositions)
+      return rows.map((preset) => {
+        const capability = capabilities.get(preset.id)
+        return {
+          id: preset.id,
+          ...(preset.name !== undefined ? { name: preset.name } : {}),
+          ...(preset.description !== undefined ? { description: preset.description } : {}),
+          ...(defaultId !== undefined && preset.id === defaultId ? { isDefault: true } : {}),
+          ...(capability?.broken === true ? { broken: true } : {}),
+          ...(capability !== undefined ? { plugins: capability.plugins } : {}),
+        }
+      })
     },
     // ── inbound ─────────────────────────────────────────────────────────
     listInboundServers(): InboundServerView[] {

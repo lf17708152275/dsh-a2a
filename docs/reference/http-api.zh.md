@@ -26,13 +26,18 @@ update-time: 2026-10-25
 | 方法与路径 | 返回 |
 |---|---|
 | `GET /a2a/api` | 快照：`{ version, inbounds, outbounds, tasks, taskTotal, taskNextOffset, peers, sessions, metrics }` |
-| `GET /a2a/api/presets` | Agent preset 名单：`[{ id, name?, description?, isDefault? }]` |
+| `GET /a2a/api/presets` | Agent preset 名单 + 每个预设会挂载的插件：`[{ id, name?, description?, isDefault?, broken?, plugins?: [{ entryId, module, enabled, condition? }] }]` |
 | `GET /a2a/api/models` | 可路由模型清单：`[{ provider, id, name }]`（宿主没有 LLM 服务时返回空数组） |
 | `GET /a2a/api/update` | 插件版本与更新检查结果；`?refresh=1` 跳过缓存 |
 | `GET /a2a/api/card?id=<inbound>` | 一个入站 AgentCard；未知 id 返回 `404` |
 | `GET /a2a/api/task?id=<task>` | 一条任务；未知 id 返回 `404` |
 | `GET /a2a/api/session?contextId=<id>&serverId=<instance>` | 某个活跃上下文会话的派生对话消息；不带 `serverId` 且上下文有歧义时返回 `409` |
 | `GET /a2a/api/metrics` | 指标快照 |
+
+`GET /a2a/api/presets` 回答"A2A 会话实际会带哪些插件"：`plugins` 是该预设按声明顺序
+组合出来的插件行；`enabled` 为 `true`/`false`，`!!js` 条件行为 `'conditional'` 并附带
+`condition` 源码；`broken` 表示宿主没能组合出该预设。宿主无法枚举组合时该数组为空，
+预设选择仍然可用。
 
 `GET /a2a/api/session` 是仅回环的调试视图。它返回原始派生 DSH 消息，可能包含
 reasoning block；它不是 A2A 线协议的一部分，也不会通过 A2A 暴露 reasoning。

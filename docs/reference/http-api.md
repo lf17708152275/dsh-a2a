@@ -27,13 +27,20 @@ loopback peers (`127.0.0.1`, `::1`, `::ffff:127.0.0.1`); any other peer gets
 | Method and path | Returns |
 |---|---|
 | `GET /a2a/api` | Snapshot: `{ version, inbounds, outbounds, tasks, taskTotal, taskNextOffset, peers, sessions, metrics }` |
-| `GET /a2a/api/presets` | Agent-preset roster: `[{ id, name?, description?, isDefault? }]` |
+| `GET /a2a/api/presets` | Agent-preset roster with the plugins each preset mounts: `[{ id, name?, description?, isDefault?, broken?, plugins?: [{ entryId, module, enabled, condition? }] }]` |
 | `GET /a2a/api/models` | Routable model catalogue: `[{ provider, id, name }]` (empty when the host exposes no LLM service) |
 | `GET /a2a/api/update` | Plugin version and update-check answer; `?refresh=1` bypasses the cache |
 | `GET /a2a/api/card?id=<inbound>` | One inbound AgentCard; `404` when unknown |
 | `GET /a2a/api/task?id=<task>` | One task; `404` when unknown |
 | `GET /a2a/api/session?contextId=<id>&serverId=<instance>` | Derived conversation messages of one live context session; `409` when the context is ambiguous without `serverId` |
 | `GET /a2a/api/metrics` | Metrics snapshot |
+
+`GET /a2a/api/presets` answers what an A2A session will actually carry: the
+`plugins` array is the preset's composed plugin rows in declaration order.
+`enabled` is `true`, `false`, or `'conditional'` for `!!js` rows (with the
+`condition` source); `broken` marks a preset the host could not compose. When
+the host cannot enumerate compositions the array is empty — preset selection
+still works.
 
 `GET /a2a/api/session` is a loopback-only debugging view. It returns the raw
 derived DSH messages, which may include reasoning blocks; it is not part of the

@@ -17,6 +17,18 @@ export interface OpResult {
   readonly message: string
 }
 
+/** One plugin row of the preset an inbound session will mount. */
+export interface PresetPluginView {
+  /** Row id inside the preset declaration, when it has one. */
+  readonly entryId: string | null
+  /** Plugin/module name, e.g. `@deepseek-ai/dsh-persona`. */
+  readonly module: string
+  /** `false` = declared but disabled, `'conditional'` = `!!js` condition. */
+  readonly enabled: boolean | 'conditional'
+  /** The `!!js` condition source for conditional rows. */
+  readonly condition?: string
+}
+
 /** Agent-preset roster row shown in the instance pickers. */
 export interface PresetView {
   readonly id: string
@@ -24,6 +36,10 @@ export interface PresetView {
   readonly description?: string
   /** Whether this preset is the deployment default when none is named. */
   readonly isDefault?: boolean
+  /** Whether the host reports this preset as broken (failed to compose). */
+  readonly broken?: boolean
+  /** Plugins a session started from this preset carries, in declaration order. */
+  readonly plugins?: readonly PresetPluginView[]
 }
 
 /** A skill declaration as the GUI reads it. */

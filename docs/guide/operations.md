@@ -66,7 +66,12 @@ inherit the deployment default when left empty. The advertised base URL is no
 longer configured per inbound: the **deployment settings** card at the top of the
 tab owns it for the whole deployment (see below).
 Skills are shown after creation; you do not type them. The preset picker lists
-the real roster and preselects the deployment default.
+the real roster and preselects the deployment default. Each option shows how many
+plugins that preset mounts, and expanding the **capabilities** line under the
+picker lists the plugin rows themselves (module, `enabled` / `disabled` /
+`conditional:<expr>`), so you can see exactly what an A2A session from this
+endpoint will carry before creating it. The same count appears as a badge on the
+instance card.
 
 At the top of the inbound tab, **Deployment settings · advertised URL** sets the
 deployment-wide advertised base URL without editing the profile config: *follow
