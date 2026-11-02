@@ -336,7 +336,7 @@ export async function resolveAuthToken(
 function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], authToken: string | undefined, host: InboundManagerHost): LiveInboundServer {
   const endpointPath = record.endpointPath
   const cardPath = `${endpointPath.replace(/\/$/, '')}/agent-card.json`
-  const preset = record.preset ?? host.defaultPresetId
+  const preset = trimOptional(record.preset) ?? host.defaultPresetId
   const traceEnabled = host.inboundTrace && (record.trace ?? host.inboundTrace)
   // Per-instance workspace/model overrides (additive: absent = deployment default).
   const sessionCwd = resolveInstanceCwd(record, host.sessionCwd)
@@ -548,7 +548,7 @@ export class InboundServerManager {
   async boot(): Promise<void> {
     for (const record of this.store.list()) {
       try {
-        const skills = await derivePresetSkills(this.host.agentPresets, this.host.skills, record.preset ?? this.host.defaultPresetId)
+        const skills = await derivePresetSkills(this.host.agentPresets, this.host.skills, trimOptional(record.preset) ?? this.host.defaultPresetId)
         const token = await resolveAuthToken(this.host.credentials, record.authTokenEnv)
         const live = assemble(record, skills, token, this.host)
         this.live.set(record.id, live)
@@ -577,7 +577,7 @@ export class InboundServerManager {
     if (!advertisedBaseUrl.ok) return { ok: false, message: advertisedBaseUrl.message }
     const provider = trimOptional(input.provider)
     const model = trimOptional(input.model)
-    const preset = input.preset ?? this.host.defaultPresetId
+    const preset = trimOptional(input.preset) ?? this.host.defaultPresetId
     const record: InboundServerRecord = {
       id,
       name: input.name,
@@ -621,18 +621,19 @@ export class InboundServerManager {
     }
     // Overrides are additive and clearable: an explicit blank string removes the
     // override so the instance falls back to the deployment default again.
-    const { workspace: _dropWs, provider: _dropProv, model: _dropModel, baseUrl: _dropBase, ...base } = stored
+    const { workspace: _dropWs, provider: _dropProv, model: _dropModel, baseUrl: _dropBase, preset: _dropPreset, ...base } = stored
     const nextWorkspace = patch.workspace !== undefined ? trimOptional(patch.workspace) : stored.workspace
     const nextProvider = patch.provider !== undefined ? trimOptional(patch.provider) : stored.provider
     const nextModel = patch.model !== undefined ? trimOptional(patch.model) : stored.model
     const nextBaseUrl = patch.baseUrl !== undefined ? trimOptional(patch.baseUrl)?.replace(/\/$/, '') : stored.baseUrl
+    const nextPreset = patch.preset !== undefined ? trimOptional(patch.preset) : trimOptional(stored.preset)
     const next: InboundServerRecord = {
       ...base,
       name: patch.name ?? stored.name,
       description: patch.description ?? stored.description,
       version: patch.version ?? stored.version,
       endpointPath: patch.endpointPath ?? stored.endpointPath,
-      ...(patch.preset !== undefined ? { preset: patch.preset } : {}),
+      ...(nextPreset !== undefined ? { preset: nextPreset } : {}),
       ...(patch.authTokenEnv !== undefined ? { authTokenEnv: patch.authTokenEnv } : {}),
       ...(patch.trace !== undefined ? { trace: patch.trace } : {}),
       ...(nextWorkspace !== undefined ? { workspace: nextWorkspace } : {}),

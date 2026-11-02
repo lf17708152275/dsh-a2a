@@ -374,6 +374,8 @@ function makeFacade(host: FacadeHost): A2AServiceImpl {
       endpointPath: live.endpointPath,
       // Effective preset: the record's, else the deployment default.
       ...(live.preset !== undefined ? { preset: live.preset } : {}),
+      // Raw override: absent when the instance follows the deployment default.
+      ...(r.preset !== undefined ? { presetOverride: r.preset } : {}),
       ...(r.authTokenEnv !== undefined ? { authTokenEnv: r.authTokenEnv } : {}),
       cardPath: live.cardPath,
       ...(!autoBaseUrl && live.card.supportedInterfaces?.[0]?.url !== undefined ? { cardUrl: live.card.supportedInterfaces[0].url } : {}),

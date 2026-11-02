@@ -64,7 +64,10 @@ export interface InboundServerView {
   readonly description: string
   readonly version: string
   readonly endpointPath: string
+  /** Effective preset id (the record's, else the deployment default). */
   readonly preset?: string
+  /** Explicit preset override; absent = the instance follows the deployment default. */
+  readonly presetOverride?: string
   readonly authTokenEnv?: string
   readonly cardPath: string
   readonly cardUrl?: string

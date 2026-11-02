@@ -424,6 +424,41 @@ describe('InboundServerManager overrides', () => {
     expect(await servedUrl({})).toBe(`http://127.0.0.1/a2a/${created.id}`)
   })
 
+  it('falls back to the deployment default preset when none is supplied', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base })
+    expect(created.ok).toBe(true)
+    expect(rows.get(created.id!)?.preset).toBeUndefined()
+  })
+
+  it('normalises a blank or padded preset to the deployment default', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const blank = await manager.add({ ...base, preset: '   ' })
+    expect(blank.ok).toBe(true)
+    expect(rows.get(blank.id!)?.preset).toBeUndefined()
+    const padded = await manager.add({ ...base, preset: '  card-06  ' })
+    expect(padded.ok).toBe(true)
+    expect(rows.get(padded.id!)?.preset).toBe('card-06')
+  })
+
+  it('clears the preset override when an update sends a blank value', async () => {
+    const { store, rows } = memoryStore()
+    const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
+    const created = await manager.add({ ...base, preset: 'card-06' })
+    const id = created.id!
+    expect(rows.get(id)?.preset).toBe('card-06')
+
+    const cleared = await manager.update(id, { preset: '' })
+    expect(cleared.ok).toBe(true)
+    expect(rows.get(id)?.preset).toBeUndefined()
+
+    const changed = await manager.update(id, { preset: ' card-22 ' })
+    expect(changed.ok).toBe(true)
+    expect(rows.get(id)?.preset).toBe('card-22')
+  })
+
   it('refuses an update that points at a non-directory', async () => {
     const { store, rows } = memoryStore()
     const manager = new InboundServerManager(hostWith('/srv/default', {}), store)

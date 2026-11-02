@@ -58,6 +58,7 @@ export interface InboundServerView {
   readonly version: string
   readonly endpointPath: string
   readonly preset?: string
+  readonly presetOverride?: string
   readonly authTokenEnv?: string
   readonly cardPath: string
   readonly cardUrl?: string
@@ -491,7 +492,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInName('')
     setInDesc('')
     setInVersion('1.0.0')
-    setInPreset(presets.find((p) => p.isDefault)?.id ?? '')
+    setInPreset('')
     setInToken('')
     setInClearAuth(false)
     setInTrace(false)
@@ -505,7 +506,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
     setInName(v.name)
     setInDesc(v.description)
     setInVersion(v.version)
-    setInPreset(v.preset ?? presets.find((p) => p.isDefault)?.id ?? '')
+    setInPreset(v.presetOverride ?? '')
     setInToken('')
     setInClearAuth(false)
     setInTrace(v.trace)
@@ -520,7 +521,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
       name: inName.trim(),
       description: inDesc.trim() || 'An A2A inbound server',
       version: inVersion.trim() || '1.0.0',
-      ...(inPreset !== '' ? { preset: inPreset } : {}),
+      preset: inPreset.trim(),
       trace: inTrace,
       // Blank clears the override (update) / inherits the default (create).
       workspace: inWorkspace.trim(),
@@ -762,7 +763,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                         createElement('div', { className: 'dsh-a2a-card-head' },
                           createElement('span', { 'data-state': v.enabled ? 'connected' : 'disabled', className: 'dsh-a2a-dot' }),
                           createElement('span', { className: 'dsh-a2a-card-name' }, v.name),
-                          createElement('span', { className: 'dsh-a2a-badge' }, presetLabel(presets, v.preset)),
+                          createElement('span', { className: 'dsh-a2a-badge', title: v.presetOverride === undefined ? '跟随部署默认预设' : `预设 ${v.presetOverride}` }, v.presetOverride === undefined ? `默认·${presetLabel(presets, v.preset)}` : presetLabel(presets, v.preset)),
                           createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono' }, `v${v.version}`),
                           ...(v.trace ? [createElement('span', { className: 'dsh-a2a-badge', key: 'trace' }, 'trace')] : []),
                           ...(v.model !== undefined || v.provider !== undefined
@@ -795,7 +796,8 @@ export function A2aSection(_props: SectionProps): ReactElement {
               createElement('form', { className: 'dsh-a2a-form', onSubmit: (ev: { preventDefault(): void }) => { ev.preventDefault(); void submitInbound() } },
                 createElement('input', { className: 'dsh-a2a-input', value: inName, placeholder: '名称', onChange: (e: { target: { value: string } }) => setInName(e.target.value) }),
                 createElement('input', { className: 'dsh-a2a-input', value: inVersion, placeholder: '版本', style: { width: '76px' }, onChange: (e: { target: { value: string } }) => setInVersion(e.target.value) }),
-                createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value) },
+                createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value), title: '绑定这个端点使用的 Agent 预设；选「默认」= 跟随部署默认预设' },
+                  createElement('option', { value: '', key: '__default__' }, '（默认：跟随部署）'),
                   ...presets.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, p.name ?? p.id)),
                 ),
                 createElement('input', {
