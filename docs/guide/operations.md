@@ -44,15 +44,16 @@ show the remote card's version once connected.
 
 ### Inbound servers
 
-Each card shows the name, endpoint path, preset badge, auth state, derived skill
-chips and the live card URL. Actions:
+Each card shows the name, the full external endpoint URL (the same URL an
+external A2A client uses), preset badge, auth state and derived skill chips.
+Actions:
 
 | Action | Effect |
 |---|---|
 | **Enable / Disable** | Registers or unregisters the card and endpoint routes; the record and session pool stay |
 | **Card** | Opens the current AgentCard JSON |
 | **Test** | Sends a message through the built-in console (same gate and task lifecycle, no HTTP auth) |
-| **Edit** | Changes name, description, version, preset or token; re-derives skills and swaps the live instance |
+| **Edit** | Expands the edit form inline in that card (the card's action row hides until you save or cancel); changes name, description, version, preset, workspace, model, tool allow-list or token; re-derives skills and swaps the live instance |
 | **Delete** | Disposes the live instance and removes the persisted record |
 | **Clear auth** | Appears on an authenticated instance; removes the stored token and rebuilds it anonymously |
 

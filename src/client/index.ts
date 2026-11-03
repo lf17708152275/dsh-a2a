@@ -736,6 +736,148 @@ export function A2aSection(_props: SectionProps): ReactElement {
       .catch(() => setNotice('复制不了，请手动选中命令'))
   }
 
+  /**
+   * 创建 / 编辑入站 Server 的表单主体（标题 + 表单 + 鉴权 / 描述 / 提示）。
+   * 新建时渲染在列表底部；编辑时直接展开在对应的入站卡片内部，保存或取消后 editingIn 复位即自动收起。
+   */
+  const renderInboundFormBody = (title: string): (ReactElement | null)[] => [
+    h(title),
+        createElement('form', { className: 'dsh-a2a-form', onSubmit: (ev: { preventDefault(): void }) => { ev.preventDefault(); void submitInbound() } },
+          createElement('input', { className: 'dsh-a2a-input', value: inName, placeholder: '名称', onChange: (e: { target: { value: string } }) => setInName(e.target.value) }),
+          createElement('input', { className: 'dsh-a2a-input', value: inVersion, placeholder: '版本', style: { width: '76px' }, onChange: (e: { target: { value: string } }) => setInVersion(e.target.value) }),
+          createElement('input', {
+            className: 'dsh-a2a-input',
+            value: presetFilter,
+            placeholder: '按能力筛选预设（如 终端 / 表情 / 子代理）',
+            title: '按插件中文名或模块名过滤上面的预设清单，方便按能力挑预设',
+            style: { width: '240px' },
+            onChange: (e: { target: { value: string } }) => setPresetFilter(e.target.value),
+          }),
+          (() => {
+            const keyword = presetFilter.trim().toLowerCase()
+            const matches = (preset: PresetView): boolean => {
+              if (keyword === '') return true
+              const haystack = [
+                preset.id,
+                preset.name ?? '',
+                preset.description ?? '',
+                ...(preset.plugins ?? []).flatMap((plugin) => [plugin.label ?? '', plugin.module]),
+              ].join(' ').toLowerCase()
+              return haystack.includes(keyword)
+            }
+            const visible = presets.filter(matches)
+            const current = presets.find((preset) => preset.id === inPreset)
+            const candidates = current !== undefined && !visible.includes(current) ? [...visible, current] : visible
+            return createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value), title: '绑定这个端点使用的 Agent 预设；选「默认」= 跟随部署默认预设' },
+              createElement('option', { value: '', key: '__default__' }, '（默认：跟随部署）'),
+              ...candidates.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, `${p.name ?? p.id}（${mountedPluginCount(p)} 项能力）`)),
+            )
+          })(),
+          (() => {
+            const activePreset = presets.find((p) => p.id === inPreset) ?? presets.find((p) => p.isDefault === true)
+            if (activePreset === undefined) return null
+            const plugins = activePreset.plugins ?? []
+            return createElement('details', { className: 'dsh-a2a-hint', style: { flexBasis: '100%', margin: '2px 0 4px' } },
+              createElement('summary', { style: { cursor: 'pointer' } },
+                `该预设的 A2A 会话会携带 ${mountedPluginCount(activePreset)} 个插件${plugins.length > mountedPluginCount(activePreset) ? `（声明 ${plugins.length} 行）` : ''} · ${activePreset.name ?? activePreset.id}`,
+              ),
+              createElement('div', { className: 'dsh-a2a-hint', style: { marginTop: '4px' } },
+                '这里是预设自己声明挂载的插件；实际会话还会叠加部署级插件（例如贴纸、团队工具），完整运行时清单以 DSH 会话页的插件视图为准。'),
+              plugins.length === 0
+                ? createElement('div', { className: 'dsh-a2a-hint' }, '宿主没有提供这个预设的插件清单（预设仍可用，只是不能在这里预读）。')
+                : createElement('div', { style: { marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+                    ...plugins.map((plugin, i) => createElement('span', {
+                      className: 'dsh-a2a-skill',
+                      key: `${plugin.module}:${plugin.entryId ?? i}`,
+                      title: pluginTitle(plugin),
+                    }, pluginLabel(plugin))),
+                  ),
+            )
+          })(),
+          (() => {
+            const keyword = toolFilter.trim().toLowerCase()
+            const visible = tools.filter((tool) => keyword === '' || tool.name.toLowerCase().includes(keyword) || (tool.description ?? '').toLowerCase().includes(keyword))
+            const selected = new Set(inToolAllow)
+            const toggle = (name: string): void => {
+              setInToolAllow((current) => current.includes(name) ? current.filter((value) => value !== name) : [...current, name])
+            }
+            return createElement('details', { className: 'dsh-a2a-hint', style: { flexBasis: '100%', margin: '2px 0 4px' } },
+              createElement('summary', { style: { cursor: 'pointer' } },
+                inToolAllow.length === 0
+                  ? `工具白名单：未限制（会话可见全部 ${tools.length} 个全局工具）`
+                  : `工具白名单：只保留 ${inToolAllow.length} 个工具（其余工具连同 schema 移出上下文）${
+                    tools.length > 0 ? `，共 ${tools.length} 个可选` : ''}`),
+              createElement('div', { className: 'dsh-a2a-hint', style: { marginTop: '4px' } },
+                '纯对话端点一般只需要贴纸等少数工具；勾选后其余工具不再进入每轮上下文的工具区，能省 token。清空全部勾选 = 恢复全量。改动对新会话生效（老会话沿用创建时的工具集，需要的话用「换新会话」）。'),
+              createElement('input', {
+                className: 'dsh-a2a-input',
+                value: toolFilter,
+                placeholder: '搜索工具名或说明（如 sticker / web / bash）',
+                style: { width: '100%', margin: '4px 0' },
+                onChange: (e: { target: { value: string } }) => setToolFilter(e.target.value),
+              }),
+              createElement('div', { style: { maxHeight: '170px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '4px' } },
+                ...(visible.length === 0
+                  ? [createElement('div', { className: 'dsh-a2a-hint', key: '__none' },
+                      tools.length === 0 ? '宿主没有提供工具清单（tools 服务未挂载）。' : '没有匹配的工具。')]
+                  : visible.map((tool) => createElement('label', {
+                      key: tool.name,
+                      title: tool.description ?? tool.name,
+                      style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' },
+                    },
+                      createElement('input', {
+                        type: 'checkbox',
+                        checked: selected.has(tool.name),
+                        onChange: () => toggle(tool.name),
+                      }),
+                      createElement('span', { style: { fontFamily: 'monospace' } }, tool.name),
+                      tool.description !== undefined
+                        ? createElement('span', { className: 'dsh-a2a-hint' }, `· ${tool.description}`)
+                        : null,
+                    )))),
+            )
+          })(),
+          createElement('input', {
+            className: 'dsh-a2a-input',
+            value: inWorkspace,
+            placeholder: editingIn !== null ? '工作空间绝对路径（留空 = 恢复默认 ~/.dsh/a2a-sessions）' : '工作空间绝对路径（可选，留空 = 默认 ~/.dsh/a2a-sessions）',
+            style: { flex: 1, minWidth: '280px' },
+            onChange: (e: { target: { value: string } }) => setInWorkspace(e.target.value),
+          }),
+          createElement('select', {
+            className: 'dsh-a2a-select',
+            value: inModelKey,
+            title: '该入站实例使用的模型（留空 = 继承部署默认）',
+            style: { width: '260px' },
+            onChange: (e: { target: { value: string } }) => setInModelKey(e.target.value),
+          },
+            createElement('option', { value: '', key: '' }, '模型：继承部署默认'),
+            ...models.map((m) => createElement('option', {
+              value: modelKey(m.provider, m.id),
+              key: modelKey(m.provider, m.id),
+              title: `${m.provider} / ${m.id}`,
+            }, `${m.name}（${m.provider}/${m.id}）`)),
+            ...(inModelKey !== '' && !models.some((m) => modelKey(m.provider, m.id) === inModelKey)
+              ? [createElement('option', { value: inModelKey, key: `custom:${inModelKey}` }, `已配置：${inModelKey}`)]
+              : []),
+          ),
+          createElement('input', { className: 'dsh-a2a-input', type: 'password', value: inToken, placeholder: editingIn !== null ? 'Bearer Token（留空不改，填写则更新）' : 'Bearer Token（可选）', onChange: (e: { target: { value: string } }) => setInToken(e.target.value) }),
+          createElement('input', { className: 'dsh-a2a-input', value: inDesc, placeholder: '描述（可选，用来标记这个端点的用途）', style: { flex: 1, minWidth: '260px' }, onChange: (e: { target: { value: string } }) => setInDesc(e.target.value) }),
+          createElement('label', { className: 'dsh-a2a-hint' },
+            createElement('input', { type: 'checkbox', checked: inTrace, onChange: (e: { target: { checked: boolean } }) => setInTrace(e.target.checked) }),
+            ' 允许 trace 扩展（工具名/脱敏摘要，默认关闭）',
+          ),
+          createElement('button', { className: 'dsh-a2a-btn dsh-a2a-btn-primary', type: 'submit', disabled: busy || !inName.trim() }, editingIn !== null ? '保存修改' : '创建 Server'),
+          editingIn !== null ? createElement('button', { className: 'dsh-a2a-btn', type: 'button', disabled: busy, onClick: () => beginCreateInbound() }, '取消') : null,
+        ),
+        editingIn !== null && (snap?.inbounds.find((x) => x.id === editingIn)?.authTokenEnv) !== undefined
+          ? createElement('div', { className: 'dsh-a2a-form' },
+              createElement('label', { className: 'dsh-a2a-hint' }, '已配置鉴权。'),
+              createElement('button', { className: 'dsh-a2a-btn', type: 'button', disabled: busy, onClick: () => { setInClearAuth(true); void submitInbound() } }, '清除鉴权'),
+            )
+          : null,
+        createElement('div', { className: 'dsh-a2a-hint' }, '技能由所绑 preset 自动派生（一切皆插件）；Bearer Token 可留空（匿名）。'),
+  ]
   return createElement(
     'div',
     { className: 'dsh-a2a-root' },
@@ -864,7 +1006,15 @@ export function A2aSection(_props: SectionProps): ReactElement {
                           ...(v.workspace !== undefined ? [createElement('span', { className: 'dsh-a2a-badge dsh-a2a-mono', key: 'ws', title: v.workspace }, 'cwd')] : []),
                           createElement('span', { className: 'dsh-a2a-auth' }, v.authTokenEnv !== undefined ? '· 已配置鉴权' : '· 匿名'),
                         ),
-                        createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `${v.endpointPath} · ${v.cardUrl ?? v.cardPath}`),
+                        (() => {
+                          // 非编辑态展示完整对外 URL：当前页面 origin + 端点路径，最接近外部 A2A 客户端拿到的地址
+                          const origin = typeof location !== 'undefined' ? location.origin : ''
+                          const fullUrl = `${origin}${v.endpointPath}`
+                          return createElement('div', {
+                            className: 'dsh-a2a-card-sub dsh-a2a-mono',
+                            title: `完整地址：${fullUrl}\nAgent Card：${fullUrl}/agent-card.json`,
+                          }, fullUrl)
+                        })(),
                         v.workspace !== undefined
                           ? createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `cwd: ${v.workspace}`)
                           : null,
@@ -887,157 +1037,21 @@ export function A2aSection(_props: SectionProps): ReactElement {
                         v.skills.length > 0
                           ? createElement('div', null, ...v.skills.map((s) => createElement('span', { className: 'dsh-a2a-skill', key: s.id, title: s.description ?? '' }, s.name)))
                           : null,
-                        createElement('div', { className: 'dsh-a2a-btn-row' },
+                        editingIn === v.id ? null : createElement('div', { className: 'dsh-a2a-btn-row' },
                           createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: v.enabled ? 'inbound.disable' : 'inbound.enable', id: v.id }) } }, v.enabled ? '停用' : '启用'),
                           createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void openCard(v.id) } }, 'Card'),
                           createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { setTestInbound(v.id); setTestSkill(v.skills[0]?.id ?? 'chat'); setTestResult(undefined) } }, '测试'),
                           createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => beginEditInbound(v) }, '编辑'),
                           createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: 'inbound.remove', id: v.id }); if (editingIn === v.id) beginCreateInbound() } }, '删除'),
                         ),
+                        ...(editingIn === v.id ? renderInboundFormBody('编辑入站 Server') : []),
                       ),
                     ),
                   ),
             ),
-            createElement('div', { className: 'dsh-a2a-card' },
-              h(editingIn !== null ? '编辑入站 Server' : '新建入站 Server'),
-              createElement('form', { className: 'dsh-a2a-form', onSubmit: (ev: { preventDefault(): void }) => { ev.preventDefault(); void submitInbound() } },
-                createElement('input', { className: 'dsh-a2a-input', value: inName, placeholder: '名称', onChange: (e: { target: { value: string } }) => setInName(e.target.value) }),
-                createElement('input', { className: 'dsh-a2a-input', value: inVersion, placeholder: '版本', style: { width: '76px' }, onChange: (e: { target: { value: string } }) => setInVersion(e.target.value) }),
-                createElement('input', {
-                  className: 'dsh-a2a-input',
-                  value: presetFilter,
-                  placeholder: '按能力筛选预设（如 终端 / 表情 / 子代理）',
-                  title: '按插件中文名或模块名过滤上面的预设清单，方便按能力挑预设',
-                  style: { width: '240px' },
-                  onChange: (e: { target: { value: string } }) => setPresetFilter(e.target.value),
-                }),
-                (() => {
-                  const keyword = presetFilter.trim().toLowerCase()
-                  const matches = (preset: PresetView): boolean => {
-                    if (keyword === '') return true
-                    const haystack = [
-                      preset.id,
-                      preset.name ?? '',
-                      preset.description ?? '',
-                      ...(preset.plugins ?? []).flatMap((plugin) => [plugin.label ?? '', plugin.module]),
-                    ].join(' ').toLowerCase()
-                    return haystack.includes(keyword)
-                  }
-                  const visible = presets.filter(matches)
-                  const current = presets.find((preset) => preset.id === inPreset)
-                  const candidates = current !== undefined && !visible.includes(current) ? [...visible, current] : visible
-                  return createElement('select', { className: 'dsh-a2a-select', value: inPreset, onChange: (e: { target: { value: string } }) => setInPreset(e.target.value), title: '绑定这个端点使用的 Agent 预设；选「默认」= 跟随部署默认预设' },
-                    createElement('option', { value: '', key: '__default__' }, '（默认：跟随部署）'),
-                    ...candidates.map((p) => createElement('option', { value: p.id, key: p.id, title: p.description ?? p.id }, `${p.name ?? p.id}（${mountedPluginCount(p)} 项能力）`)),
-                  )
-                })(),
-                (() => {
-                  const activePreset = presets.find((p) => p.id === inPreset) ?? presets.find((p) => p.isDefault === true)
-                  if (activePreset === undefined) return null
-                  const plugins = activePreset.plugins ?? []
-                  return createElement('details', { className: 'dsh-a2a-hint', style: { flexBasis: '100%', margin: '2px 0 4px' } },
-                    createElement('summary', { style: { cursor: 'pointer' } },
-                      `该预设的 A2A 会话会携带 ${mountedPluginCount(activePreset)} 个插件${plugins.length > mountedPluginCount(activePreset) ? `（声明 ${plugins.length} 行）` : ''} · ${activePreset.name ?? activePreset.id}`,
-                    ),
-                    createElement('div', { className: 'dsh-a2a-hint', style: { marginTop: '4px' } },
-                      '这里是预设自己声明挂载的插件；实际会话还会叠加部署级插件（例如贴纸、团队工具），完整运行时清单以 DSH 会话页的插件视图为准。'),
-                    plugins.length === 0
-                      ? createElement('div', { className: 'dsh-a2a-hint' }, '宿主没有提供这个预设的插件清单（预设仍可用，只是不能在这里预读）。')
-                      : createElement('div', { style: { marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' } },
-                          ...plugins.map((plugin, i) => createElement('span', {
-                            className: 'dsh-a2a-skill',
-                            key: `${plugin.module}:${plugin.entryId ?? i}`,
-                            title: pluginTitle(plugin),
-                          }, pluginLabel(plugin))),
-                        ),
-                  )
-                })(),
-                (() => {
-                  const keyword = toolFilter.trim().toLowerCase()
-                  const visible = tools.filter((tool) => keyword === '' || tool.name.toLowerCase().includes(keyword) || (tool.description ?? '').toLowerCase().includes(keyword))
-                  const selected = new Set(inToolAllow)
-                  const toggle = (name: string): void => {
-                    setInToolAllow((current) => current.includes(name) ? current.filter((value) => value !== name) : [...current, name])
-                  }
-                  return createElement('details', { className: 'dsh-a2a-hint', style: { flexBasis: '100%', margin: '2px 0 4px' }, open: inToolAllow.length > 0 },
-                    createElement('summary', { style: { cursor: 'pointer' } },
-                      inToolAllow.length === 0
-                        ? `工具白名单：未限制（会话可见全部 ${tools.length} 个全局工具）`
-                        : `工具白名单：只保留 ${inToolAllow.length} 个工具（其余工具连同 schema 移出上下文）${
-                          tools.length > 0 ? `，共 ${tools.length} 个可选` : ''}`),
-                    createElement('div', { className: 'dsh-a2a-hint', style: { marginTop: '4px' } },
-                      '纯对话端点一般只需要贴纸等少数工具；勾选后其余工具不再进入每轮上下文的工具区，能省 token。清空全部勾选 = 恢复全量。改动对新会话生效（老会话沿用创建时的工具集，需要的话用「换新会话」）。'),
-                    createElement('input', {
-                      className: 'dsh-a2a-input',
-                      value: toolFilter,
-                      placeholder: '搜索工具名或说明（如 sticker / web / bash）',
-                      style: { width: '100%', margin: '4px 0' },
-                      onChange: (e: { target: { value: string } }) => setToolFilter(e.target.value),
-                    }),
-                    createElement('div', { style: { maxHeight: '170px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '4px' } },
-                      ...(visible.length === 0
-                        ? [createElement('div', { className: 'dsh-a2a-hint', key: '__none' },
-                            tools.length === 0 ? '宿主没有提供工具清单（tools 服务未挂载）。' : '没有匹配的工具。')]
-                        : visible.map((tool) => createElement('label', {
-                            key: tool.name,
-                            title: tool.description ?? tool.name,
-                            style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' },
-                          },
-                            createElement('input', {
-                              type: 'checkbox',
-                              checked: selected.has(tool.name),
-                              onChange: () => toggle(tool.name),
-                            }),
-                            createElement('span', { style: { fontFamily: 'monospace' } }, tool.name),
-                            tool.description !== undefined
-                              ? createElement('span', { className: 'dsh-a2a-hint' }, `· ${tool.description}`)
-                              : null,
-                          )))),
-                  )
-                })(),
-                createElement('input', {
-                  className: 'dsh-a2a-input',
-                  value: inWorkspace,
-                  placeholder: editingIn !== null ? '工作空间绝对路径（留空 = 恢复默认 ~/.dsh/a2a-sessions）' : '工作空间绝对路径（可选，留空 = 默认 ~/.dsh/a2a-sessions）',
-                  style: { flex: 1, minWidth: '280px' },
-                  onChange: (e: { target: { value: string } }) => setInWorkspace(e.target.value),
-                }),
-                createElement('select', {
-                  className: 'dsh-a2a-select',
-                  value: inModelKey,
-                  title: '该入站实例使用的模型（留空 = 继承部署默认）',
-                  style: { width: '260px' },
-                  onChange: (e: { target: { value: string } }) => setInModelKey(e.target.value),
-                },
-                  createElement('option', { value: '', key: '' }, '模型：继承部署默认'),
-                  ...models.map((m) => createElement('option', {
-                    value: modelKey(m.provider, m.id),
-                    key: modelKey(m.provider, m.id),
-                    title: `${m.provider} / ${m.id}`,
-                  }, `${m.name}（${m.provider}/${m.id}）`)),
-                  ...(inModelKey !== '' && !models.some((m) => modelKey(m.provider, m.id) === inModelKey)
-                    ? [createElement('option', { value: inModelKey, key: `custom:${inModelKey}` }, `已配置：${inModelKey}`)]
-                    : []),
-                ),
-                createElement('input', { className: 'dsh-a2a-input', type: 'password', value: inToken, placeholder: editingIn !== null ? 'Bearer Token（留空不改，填写则更新）' : 'Bearer Token（可选）', onChange: (e: { target: { value: string } }) => setInToken(e.target.value) }),
-                createElement('label', { className: 'dsh-a2a-hint' },
-                  createElement('input', { type: 'checkbox', checked: inTrace, onChange: (e: { target: { checked: boolean } }) => setInTrace(e.target.checked) }),
-                  ' 允许 trace 扩展（工具名/脱敏摘要，默认关闭）',
-                ),
-                createElement('button', { className: 'dsh-a2a-btn dsh-a2a-btn-primary', type: 'submit', disabled: busy || !inName.trim() }, editingIn !== null ? '保存修改' : '创建 Server'),
-                editingIn !== null ? createElement('button', { className: 'dsh-a2a-btn', type: 'button', disabled: busy, onClick: () => beginCreateInbound() }, '取消') : null,
-              ),
-              editingIn !== null && (snap?.inbounds.find((x) => x.id === editingIn)?.authTokenEnv) !== undefined
-                ? createElement('div', { className: 'dsh-a2a-form' },
-                    createElement('label', { className: 'dsh-a2a-hint' }, '已配置鉴权。'),
-                    createElement('button', { className: 'dsh-a2a-btn', type: 'button', disabled: busy, onClick: () => { setInClearAuth(true); void submitInbound() } }, '清除鉴权'),
-                  )
-                : null,
-              createElement('div', { className: 'dsh-a2a-form' },
-                createElement('input', { className: 'dsh-a2a-input', value: inDesc, placeholder: '描述', style: { flex: 1, minWidth: '220px' }, onChange: (e: { target: { value: string } }) => setInDesc(e.target.value) }),
-              ),
-              createElement('div', { className: 'dsh-a2a-hint' }, '技能由所绑 preset 自动派生（一切皆插件）；Bearer Token 可留空（匿名）。'),
-            ),
+            editingIn === null
+              ? createElement('div', { className: 'dsh-a2a-card' }, ...renderInboundFormBody('新建入站 Server'))
+              : null,
             createElement('div', { className: 'dsh-a2a-card' },
               h('内置测试控制台', undefined),
               createElement('div', { className: 'dsh-a2a-form' },
