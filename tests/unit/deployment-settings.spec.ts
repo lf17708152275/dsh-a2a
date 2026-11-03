@@ -40,8 +40,8 @@ describe('deployment settings store', () => {
 
   it('round-trips a custom origin override', async () => {
     const { domain } = memoryDomain()
-    await writeDeploymentSettings(domain, { baseUrl: 'http://192.168.31.20' })
-    expect(readDeploymentSettings(domain)).toEqual({ baseUrl: 'http://192.168.31.20' })
+    await writeDeploymentSettings(domain, { baseUrl: 'http://192.168.1.100' })
+    expect(readDeploymentSettings(domain)).toEqual({ baseUrl: 'http://192.168.1.100' })
   })
 
   it('treats an empty record as cleared (inherit the loader config)', async () => {

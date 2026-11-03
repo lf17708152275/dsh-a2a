@@ -13,12 +13,12 @@ describe('baseUrlCandidatesFrom', () => {
   it('offers every non-internal IPv4 origin with an interface label', () => {
     const candidates = baseUrlCandidatesFrom({
       lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }],
-      wlp4s0: [{ address: '192.168.31.20', family: 'IPv4', internal: false }],
+      wlp4s0: [{ address: '192.168.1.100', family: 'IPv4', internal: false }],
       eth0: [{ address: '10.0.0.7', family: 'IPv4', internal: false }],
     })
     expect(candidates).toEqual([
       { value: 'http://10.0.0.7', label: '10.0.0.7（eth0）', interface: 'eth0' },
-      { value: 'http://192.168.31.20', label: '192.168.31.20（wlp4s0）', interface: 'wlp4s0' },
+      { value: 'http://192.168.1.100', label: '192.168.1.100（wlp4s0）', interface: 'wlp4s0' },
     ])
   })
 

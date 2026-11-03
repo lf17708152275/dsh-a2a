@@ -22,7 +22,7 @@ function fakeController(fail = false): { readonly calls: Call[]; readonly contro
 
 describe('defaultSessionTitle', () => {
   it('uses the bound context id', () => {
-    expect(defaultSessionTitle('wx3-f31891692', 'a2a-server-a5a058e1-wx3-f31891692')).toBe('wx3-f31891692')
+    expect(defaultSessionTitle('wx3-sample01', 'a2a-server-a5a058e1-wx3-sample01')).toBe('wx3-sample01')
   })
 
   it('trims the context id', () => {

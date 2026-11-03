@@ -168,7 +168,7 @@ mask applies when a session is **created**; already-open contexts keep their
 tool set, so rotate the context to adopt a new mask.
 
 `baseUrl` is an API-level override of the base URL advertised in this
-instance's agent card (for example `http://192.168.31.20`). It must be an
+instance's agent card (for example `http://192.168.1.100`). It must be an
 absolute `http(s)` URL without a path; a trailing slash is trimmed. Omitted (or
 empty) means "inherit the deployment `baseUrl` config". Only the advertised URL
 changes — the routes keep being served by the host web server.

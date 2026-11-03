@@ -163,7 +163,7 @@ describe('validateBaseUrl', () => {
   })
 
   it('accepts an absolute http URL and trims whitespace and the trailing slash', () => {
-    expect(validateBaseUrl('  http://192.168.31.20/  ')).toEqual({ ok: true, value: 'http://192.168.31.20' })
+    expect(validateBaseUrl('  http://192.168.1.100/  ')).toEqual({ ok: true, value: 'http://192.168.1.100' })
   })
 
   it('accepts an https URL with a path-free origin', () => {
@@ -183,7 +183,7 @@ describe('validateBaseUrl', () => {
   })
 
   it('rejects a non-http scheme', () => {
-    const result = validateBaseUrl('ftp://192.168.31.20')
+    const result = validateBaseUrl('ftp://192.168.1.100')
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('unreachable')
     expect(result.message).toContain('must use http or https')
@@ -198,7 +198,7 @@ describe('deriveBaseUrlFromRequest', () => {
   })
 
   it('falls back to the Host header over plain http', () => {
-    expect(deriveBaseUrlFromRequest({ headers: { host: '192.168.31.20' } })).toBe('http://192.168.31.20')
+    expect(deriveBaseUrlFromRequest({ headers: { host: '192.168.1.100' } })).toBe('http://192.168.1.100')
   })
 
   it('takes the first value of a comma-joined forwarded header', () => {
@@ -290,9 +290,9 @@ describe('InboundServerManager overrides', () => {
   it('persists the advertised baseUrl override on create', async () => {
     const { store, rows } = memoryStore()
     const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
-    const created = await manager.add({ ...base, baseUrl: ' http://192.168.31.20/ ' })
+    const created = await manager.add({ ...base, baseUrl: ' http://192.168.1.100/ ' })
     expect(created.ok).toBe(true)
-    expect(rows.get(created.id!)?.baseUrl).toBe('http://192.168.31.20')
+    expect(rows.get(created.id!)?.baseUrl).toBe('http://192.168.1.100')
   })
 
   it('omits the baseUrl override that was not supplied', async () => {
@@ -315,7 +315,7 @@ describe('InboundServerManager overrides', () => {
   it('updates and clears the baseUrl override with a blank value', async () => {
     const { store, rows } = memoryStore()
     const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
-    const created = await manager.add({ ...base, baseUrl: 'http://192.168.31.20' })
+    const created = await manager.add({ ...base, baseUrl: 'http://192.168.1.100' })
     const id = created.id!
 
     const updated = await manager.update(id, { baseUrl: 'https://companion.example.com/' })
@@ -330,11 +330,11 @@ describe('InboundServerManager overrides', () => {
   it('refuses an update with a non-http baseUrl', async () => {
     const { store, rows } = memoryStore()
     const manager = new InboundServerManager(hostWith('/srv/default', {}), store)
-    const created = await manager.add({ ...base, baseUrl: 'http://192.168.31.20' })
+    const created = await manager.add({ ...base, baseUrl: 'http://192.168.1.100' })
     const id = created.id!
-    const updated = await manager.update(id, { baseUrl: 'ftp://192.168.31.20' })
+    const updated = await manager.update(id, { baseUrl: 'ftp://192.168.1.100' })
     expect(updated.ok).toBe(false)
-    expect(rows.get(id)?.baseUrl).toBe('http://192.168.31.20')
+    expect(rows.get(id)?.baseUrl).toBe('http://192.168.1.100')
   })
 
   it('advertises the per-instance baseUrl in the assembled agent card', async () => {
@@ -376,9 +376,9 @@ describe('InboundServerManager overrides', () => {
     expect(urlOf()).toBe(`http://127.0.0.1:25675/a2a/${created.id}`)
     // The GUI setting changes the deployment default; re-assembling the live
     // instance must pick the new origin up without a restart.
-    current = 'http://192.168.31.20'
+    current = 'http://192.168.1.100'
     expect((await manager.update(created.id!, {})).ok).toBe(true)
-    expect(urlOf()).toBe(`http://192.168.31.20/a2a/${created.id}`)
+    expect(urlOf()).toBe(`http://192.168.1.100/a2a/${created.id}`)
   })
 
   it('accepts auto as the deployment default', async () => {
@@ -420,7 +420,7 @@ describe('InboundServerManager overrides', () => {
       return (JSON.parse(body) as { supportedInterfaces?: Array<{ url?: string }> })
         .supportedInterfaces?.[0]?.url
     }
-    expect(await servedUrl({ host: '192.168.31.20' })).toBe(`http://192.168.31.20/a2a/${created.id}`)
+    expect(await servedUrl({ host: '192.168.1.100' })).toBe(`http://192.168.1.100/a2a/${created.id}`)
     expect(await servedUrl({ 'x-forwarded-host': 'lan.example.com', 'x-forwarded-proto': 'https' }))
       .toBe(`https://lan.example.com/a2a/${created.id}`)
     expect(await servedUrl({})).toBe(`http://127.0.0.1/a2a/${created.id}`)

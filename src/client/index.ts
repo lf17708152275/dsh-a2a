@@ -485,7 +485,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
   const saveBaseSettings = async (): Promise<void> => {
     const value = baseMode === 'inherit' ? '' : baseMode === 'auto' ? 'auto' : baseDraft.trim()
     if (baseMode === 'custom' && value === '') {
-      setError('自定义模式需要一个绝对 URL（如 http://192.168.31.20）')
+      setError('自定义模式需要一个绝对 URL（如 http://192.168.1.100）')
       return
     }
     const result = await control({ action: 'settings.update', baseUrl: value })
@@ -816,7 +816,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                   ? createElement('input', {
                     className: 'dsh-a2a-input',
                     value: baseDraft,
-                    placeholder: 'http://192.168.31.20',
+                    placeholder: 'http://192.168.1.100',
                     onChange: (e: { target: { value: string } }) => setBaseDraft(e.target.value),
                   })
                   : null,

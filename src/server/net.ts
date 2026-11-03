@@ -10,9 +10,9 @@ import { networkInterfaces } from 'node:os'
 
 /** One origin the dashboard offers as the advertised base URL. */
 export interface BaseUrlCandidate {
-  /** Origin (`scheme://host`), e.g. `http://192.168.31.20`. */
+  /** Origin (`scheme://host`), e.g. `http://192.168.1.100`. */
   readonly value: string
-  /** Human label for the pick list, e.g. `192.168.31.20（wlp4s0）`. */
+  /** Human label for the pick list, e.g. `192.168.1.100（wlp4s0）`. */
   readonly label: string
   /** Interface name the address belongs to. */
   readonly interface: string
