@@ -51,10 +51,10 @@ Actions:
 | Action | Effect |
 |---|---|
 | **Enable / Disable** | Registers or unregisters the card and endpoint routes; the record and session pool stay |
-| **Card** | Opens the current AgentCard JSON |
-| **Test** | Sends a message through the built-in console (same gate and task lifecycle, no HTTP auth) |
+| **Card** | Expands the current AgentCard JSON inside the card (copy link / open in a new window) |
+| **Test** | Expands an inline console for that very instance (same gate and task lifecycle, no HTTP auth) |
 | **Edit** | Expands the edit form inline in that card (the card's action row hides until you save or cancel); changes name, description, version, preset, workspace, model, tool allow-list or token; re-derives skills and swaps the live instance |
-| **Delete** | Disposes the live instance and removes the persisted record |
+| **Delete** | Asks for a second click before disposing the live instance and removing the persisted record |
 | **Clear auth** | Appears on an authenticated instance; removes the stored token and rebuilds it anonymously |
 
 The create/edit form has name, version, preset, workspace, provider, model,

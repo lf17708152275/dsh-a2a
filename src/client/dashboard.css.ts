@@ -61,6 +61,13 @@ const css = String.raw`
 .dsh-a2a-btn:disabled { opacity: .5; cursor: default; }
 .dsh-a2a-btn:last-child { margin-right: 0; }
 .dsh-a2a-btn-primary { background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary, #4a7dff)); border-color: transparent; color: #fff; }
+/* hover/focus 不能把主按钮刷成白底白字（浅色主题下会像"按钮变白/文字消失"） */
+.dsh-a2a-btn-primary:hover:not(:disabled), .dsh-a2a-btn-primary:focus:not(:disabled) { background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary, #4a7dff)); border-color: transparent; color: #fff; filter: brightness(.94); }
+.dsh-a2a-btn-primary:disabled { opacity: .5; }
+.dsh-a2a-btn-danger { background: var(--dsw-alias-state-error-primary, #d92d20); border-color: transparent; color: #fff; }
+.dsh-a2a-btn-danger:hover:not(:disabled) { background: var(--dsw-alias-state-error-primary, #d92d20); border-color: transparent; color: #fff; filter: brightness(.94); }
+/* 卡片内展开的 Card / 测试面板：和卡片正文用虚线分隔，避免看起来像另一个卡片 */
+.dsh-a2a-inline-panel { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--dsw-alias-border-l2, rgba(127,127,127,.3)); }
 
 /* forms */
 .dsh-a2a-form { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; align-items: center; }

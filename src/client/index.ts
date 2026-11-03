@@ -375,6 +375,10 @@ export function A2aSection(_props: SectionProps): ReactElement {
   const [testSkill, setTestSkill] = useState('chat')
   const [testText, setTestText] = useState('')
   const [testResult, setTestResult] = useState<unknown>(undefined)
+  // 卡片内展开的 Card / 测试面板；同一时间只展开一个面板（编辑表单优先）
+  const [inlinePanel, setInlinePanel] = useState<{ id: string; mode: 'card' | 'test' } | null>(null)
+  // 删除需要二次确认：第一次点删除只把这张卡片切到确认态
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   // Inbound create/edit form.
   const [editingIn, setEditingIn] = useState<string | null>(null)
@@ -549,6 +553,27 @@ export function A2aSection(_props: SectionProps): ReactElement {
       ...(testSkill.trim() !== '' ? { skill: testSkill.trim() } : {}),
     })
     if (result.ok) setTestResult(result.task)
+  }
+
+  const closeInlinePanel = (): void => {
+    setInlinePanel(null)
+  }
+
+  const openInlineCard = async (v: InboundServerView): Promise<void> => {
+    if (editingIn !== null) beginCreateInbound()
+    setConfirmDelete(null)
+    setInlinePanel({ id: v.id, mode: 'card' })
+    setCardView(undefined)
+    await openCard(v.id)
+  }
+
+  const openInlineTest = (v: InboundServerView): void => {
+    if (editingIn !== null) beginCreateInbound()
+    setConfirmDelete(null)
+    setInlinePanel({ id: v.id, mode: 'test' })
+    setTestInbound(v.id)
+    setTestSkill(v.skills[0]?.id ?? 'chat')
+    setTestResult(undefined)
   }
 
   const toggleOutboundSkill = (id: string): void => {
@@ -735,6 +760,42 @@ export function A2aSection(_props: SectionProps): ReactElement {
       .then(() => setNotice('更新命令已复制'))
       .catch(() => setNotice('复制不了，请手动选中命令'))
   }
+
+  /** 卡片内展开的 AgentCard JSON 面板。 */
+  const renderInlineCardPanel = (v: InboundServerView): ReactElement => {
+    const origin = typeof location !== 'undefined' ? location.origin : ''
+    const cardUrl = `${origin}${v.endpointPath}/agent-card.json`
+    return createElement('div', { className: 'dsh-a2a-inline-panel' },
+      h('AgentCard JSON'),
+      createElement('pre', { className: 'dsh-a2a-detail' }, cardView !== undefined ? JSON.stringify(cardView, null, 2) : '读取中…'),
+      createElement('div', { className: 'dsh-a2a-btn-row' },
+        createElement('button', { className: 'dsh-a2a-btn', type: 'button', onClick: () => {
+          if (typeof navigator !== 'undefined' && navigator.clipboard !== undefined) {
+            navigator.clipboard.writeText(cardUrl).then(() => setNotice(`已复制 ${cardUrl}`)).catch(() => setNotice(cardUrl))
+          } else {
+            setNotice(cardUrl)
+          }
+        } }, '复制地址'),
+        createElement('button', { className: 'dsh-a2a-btn', type: 'button', onClick: () => { window.open(cardUrl, '_blank', 'noopener') } }, '新窗口打开'),
+        createElement('button', { className: 'dsh-a2a-btn', type: 'button', onClick: closeInlinePanel }, '关闭'),
+      ),
+    )
+  }
+
+  /** 卡片内展开的测试面板：只测当前这个入站实例。 */
+  const renderInlineTestPanel = (v: InboundServerView): ReactElement => createElement('div', { className: 'dsh-a2a-inline-panel' },
+    h(`测试「${v.name}」`),
+    createElement('div', { className: 'dsh-a2a-form' },
+      createElement('input', { className: 'dsh-a2a-input', value: testSkill, placeholder: 'skill', style: { width: '120px' }, onChange: (e: { target: { value: string } }) => setTestSkill(e.target.value) }),
+      createElement('input', { className: 'dsh-a2a-input', value: testContext, placeholder: 'contextId（可选）', style: { width: '180px' }, onChange: (e: { target: { value: string } }) => setTestContext(e.target.value) }),
+      createElement('input', { className: 'dsh-a2a-input', value: testText, placeholder: '发送一条测试消息', style: { flex: 1, minWidth: '220px' }, onChange: (e: { target: { value: string } }) => setTestText(e.target.value) }),
+      createElement('button', { className: 'dsh-a2a-btn dsh-a2a-btn-primary', type: 'button', disabled: busy || testText.trim() === '', onClick: () => { void submitTest() } }, '发送'),
+    ),
+    testResult !== undefined ? createElement('pre', { className: 'dsh-a2a-detail' }, JSON.stringify(testResult, null, 2)) : null,
+    createElement('div', { className: 'dsh-a2a-btn-row' },
+      createElement('button', { className: 'dsh-a2a-btn', type: 'button', onClick: closeInlinePanel }, '关闭'),
+    ),
+  )
 
   /**
    * 创建 / 编辑入站 Server 的表单主体（标题 + 表单 + 鉴权 / 描述 / 提示）。
@@ -1037,50 +1098,33 @@ export function A2aSection(_props: SectionProps): ReactElement {
                         v.skills.length > 0
                           ? createElement('div', null, ...v.skills.map((s) => createElement('span', { className: 'dsh-a2a-skill', key: s.id, title: s.description ?? '' }, s.name)))
                           : null,
-                        editingIn === v.id ? null : createElement('div', { className: 'dsh-a2a-btn-row' },
-                          createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: v.enabled ? 'inbound.disable' : 'inbound.enable', id: v.id }) } }, v.enabled ? '停用' : '启用'),
-                          createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void openCard(v.id) } }, 'Card'),
-                          createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { setTestInbound(v.id); setTestSkill(v.skills[0]?.id ?? 'chat'); setTestResult(undefined) } }, '测试'),
-                          createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => beginEditInbound(v) }, '编辑'),
-                          createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: 'inbound.remove', id: v.id }); if (editingIn === v.id) beginCreateInbound() } }, '删除'),
-                        ),
+                        confirmDelete === v.id
+                          ? createElement('div', { className: 'dsh-a2a-btn-row' },
+                              createElement('span', { className: 'dsh-a2a-hint', style: { alignSelf: 'center' } }, `确定删除「${v.name}」？这个端点会立即下线，配置不可恢复。`),
+                              createElement('button', { className: 'dsh-a2a-btn dsh-a2a-btn-danger', disabled: busy, onClick: () => {
+                                setConfirmDelete(null)
+                                void control({ action: 'inbound.remove', id: v.id })
+                                if (editingIn === v.id) beginCreateInbound()
+                                if (inlinePanel?.id === v.id) setInlinePanel(null)
+                              } }, '确认删除'),
+                              createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => setConfirmDelete(null) }, '取消'),
+                            )
+                          : editingIn === v.id || (inlinePanel?.id === v.id) ? null : createElement('div', { className: 'dsh-a2a-btn-row' },
+                              createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: v.enabled ? 'inbound.disable' : 'inbound.enable', id: v.id }) } }, v.enabled ? '停用' : '启用'),
+                              createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void openInlineCard(v) } }, 'Card'),
+                              createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { openInlineTest(v) } }, '测试'),
+                              createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { setConfirmDelete(null); setInlinePanel(null); beginEditInbound(v) } }, '编辑'),
+                              createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { setConfirmDelete(v.id) } }, '删除'),
+                            ),
                         ...(editingIn === v.id ? renderInboundFormBody('编辑入站 Server') : []),
+                        ...(inlinePanel?.id === v.id && inlinePanel.mode === 'card' ? [renderInlineCardPanel(v)] : []),
+                        ...(inlinePanel?.id === v.id && inlinePanel.mode === 'test' ? [renderInlineTestPanel(v)] : []),
                       ),
                     ),
                   ),
             ),
             editingIn === null
               ? createElement('div', { className: 'dsh-a2a-card' }, ...renderInboundFormBody('新建入站 Server'))
-              : null,
-            createElement('div', { className: 'dsh-a2a-card' },
-              h('内置测试控制台', undefined),
-              createElement('div', { className: 'dsh-a2a-form' },
-                createElement('select', {
-                  className: 'dsh-a2a-select',
-                  value: testInbound,
-                  onChange: (e: { target: { value: string } }) => {
-                    setTestInbound(e.target.value)
-                    const inbound = inbounds.find((v) => v.id === e.target.value)
-                    setTestSkill(inbound?.skills[0]?.id ?? 'chat')
-                  },
-                }, ...inbounds.map((v) => createElement('option', { value: v.id, key: v.id }, v.name))),
-                createElement('input', { className: 'dsh-a2a-input', value: testSkill, placeholder: 'skill', style: { width: '120px' }, onChange: (e: { target: { value: string } }) => setTestSkill(e.target.value) }),
-                createElement('input', { className: 'dsh-a2a-input', value: testContext, placeholder: 'contextId（可选）', style: { width: '180px' }, onChange: (e: { target: { value: string } }) => setTestContext(e.target.value) }),
-                createElement('input', { className: 'dsh-a2a-input', value: testText, placeholder: '发送一条测试消息', style: { flex: 1, minWidth: '220px' }, onChange: (e: { target: { value: string } }) => setTestText(e.target.value) }),
-                createElement('button', { className: 'dsh-a2a-btn dsh-a2a-btn-primary', type: 'button', disabled: busy || testInbound === '' || testText.trim() === '', onClick: () => { void submitTest() } }, '发送'),
-              ),
-              testResult !== undefined
-                ? createElement('pre', { className: 'dsh-a2a-detail' }, JSON.stringify(testResult, null, 2))
-                : null,
-            ),
-            cardView !== undefined
-              ? createElement('div', { className: 'dsh-a2a-card' },
-                  h('AgentCard JSON'),
-                  createElement('pre', { className: 'dsh-a2a-detail' }, JSON.stringify(cardView, null, 2)),
-                  createElement('div', { className: 'dsh-a2a-btn-row' },
-                    createElement('button', { className: 'dsh-a2a-btn', type: 'button', onClick: () => setCardView(undefined) }, '关闭'),
-                  ),
-                )
               : null,
           )
         : null,
