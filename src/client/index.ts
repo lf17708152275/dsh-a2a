@@ -1099,7 +1099,9 @@ export function A2aSection(_props: SectionProps): ReactElement {
                           ? createElement('div', null, ...v.skills.map((s) => createElement('span', { className: 'dsh-a2a-skill', key: s.id, title: s.description ?? '' }, s.name)))
                           : null,
                         confirmDelete === v.id
-                          ? createElement('div', { className: 'dsh-a2a-btn-row' },
+                          // 用 key 让 React 换掉整行而不是复用原来的按钮 DOM —— 否则红色 danger 背景会在
+                          // 取消时通过 background 过渡"退色"，看起来像卡片闪一下红
+                          ? createElement('div', { className: 'dsh-a2a-btn-row', key: 'delete-confirm' },
                               createElement('span', { className: 'dsh-a2a-hint', style: { alignSelf: 'center' } }, `确定删除「${v.name}」？这个端点会立即下线，配置不可恢复。`),
                               createElement('button', { className: 'dsh-a2a-btn dsh-a2a-btn-danger', disabled: busy, onClick: () => {
                                 setConfirmDelete(null)
@@ -1109,7 +1111,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                               } }, '确认删除'),
                               createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => setConfirmDelete(null) }, '取消'),
                             )
-                          : editingIn === v.id || (inlinePanel?.id === v.id) ? null : createElement('div', { className: 'dsh-a2a-btn-row' },
+                          : editingIn === v.id || (inlinePanel?.id === v.id) ? null : createElement('div', { className: 'dsh-a2a-btn-row', key: 'actions' },
                               createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: v.enabled ? 'inbound.disable' : 'inbound.enable', id: v.id }) } }, v.enabled ? '停用' : '启用'),
                               createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void openInlineCard(v) } }, 'Card'),
                               createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { openInlineTest(v) } }, '测试'),
