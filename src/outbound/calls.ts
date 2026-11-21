@@ -13,6 +13,7 @@ import {
   type AgentCard,
   type JsonRpcResponse,
   type Message,
+  type Part,
   type StreamResponse,
   type Task,
 } from '../protocol.ts'
@@ -356,6 +357,28 @@ function parseSseEvent(raw: string): StreamResponse | { error: { code: number; m
   }
 }
 
+/**
+ * Merge an appended artifact slice into the parts already collected.
+ *
+ * A2A `append` means "these parts continue the artifact", and streaming peers
+ * emit one small text fragment per delta. Storing each fragment as its own part
+ * makes any consumer that separates parts (a newline, a bullet) print the answer
+ * one word per line, so a text fragment is folded into the trailing text part
+ * and any non-text part still starts a new one.
+ */
+export function appendParts(existing: readonly Part[], incoming: readonly Part[]): Part[] {
+  const merged = [...existing]
+  for (const part of incoming) {
+    const last = merged[merged.length - 1]
+    if (last !== undefined && 'text' in last && typeof last.text === 'string' && 'text' in part && typeof part.text === 'string') {
+      merged[merged.length - 1] = { ...last, text: last.text + part.text }
+      continue
+    }
+    merged.push(part)
+  }
+  return merged
+}
+
 /** Fold one stream frame into the task snapshot. */
 function applyFrame(current: Task | undefined, frame: StreamResponse): Task {
   if ('task' in frame) return frame.task
@@ -387,7 +410,7 @@ function applyFrame(current: Task | undefined, frame: StreamResponse): Task {
   const index = artifacts.findIndex((artifact) => artifact.artifactId === update.artifact.artifactId)
   if (index >= 0) {
     artifacts[index] = update.append === true
-      ? { ...artifacts[index]!, parts: [...(artifacts[index]!.parts ?? []), ...update.artifact.parts] }
+      ? { ...artifacts[index]!, parts: appendParts(artifacts[index]!.parts ?? [], update.artifact.parts) }
       : { ...update.artifact }
   } else {
     artifacts.push(update.artifact)
