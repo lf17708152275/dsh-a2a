@@ -453,7 +453,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
       parts: input.parts,
       remotePeerId: input.remotePeerId,
     }
-    const decided = await host.ctx.waterfall('a2a/inbound-task', decision, async (d) => d)
+    const decided = await host.ctx.waterfall('a2a/inbound-task', decision, async () => decision)
     host.logger.info(`[a2a:${record.id}] inbound skill=${decided.skill} rejected=${decided.rejected?.reason ?? 'no'}`)
     if (decided.rejected !== undefined) return { ok: false, reason: decided.rejected.reason }
     return { ok: true }

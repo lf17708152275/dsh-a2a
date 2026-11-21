@@ -1,7 +1,7 @@
 ---
 name: Documentation
 description: Manual for @hanphone/dsh-a2a — installation, concepts, operations, HTTP API, troubleshooting, architecture, compatibility and testing
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # dsh-a2a documentation
@@ -12,7 +12,7 @@ update-time: 2026-10-25
 Inbound servers publish DSH agents; outbound connections expose remote A2A
 skills as model tools.
 
-The manual describes plugin `0.5.1` on DeepSeek Harness `0.2.1-rc.3`.
+The manual describes plugin `0.5.5` on DeepSeek Harness `0.2.2-rc.3`.
 
 ## Read this first
 
@@ -35,9 +35,10 @@ The manual describes plugin `0.5.1` on DeepSeek Harness `0.2.1-rc.3`.
 
 ## Versions and source of truth
 
-- Plugin: `@hanphone/dsh-a2a` `0.5.1`
-- Verified against: DeepSeek Harness `0.2.1-rc.3`; the e2e matrix also covers
-  `0.2.1-rc.2`, `0.2.1-alpha.2` and `0.1.7-rc.2`
+- Plugin: `@hanphone/dsh-a2a` `0.5.5`
+- Verified against: DeepSeek Harness `0.2.2-rc.3`; the e2e matrix also covers
+  `0.2.2-rc.1`, `0.2.2-alpha.2`, `0.2.1-rc.3`, `0.2.1-rc.2`,
+  `0.2.1-alpha.2` and `0.1.7-rc.2`
 - Protocol: A2A `1.0.1` JSON-RPC binding; the declared protocol version is `1.0`
 
 When this manual and the code disagree, `src/` and `tests/` win. Each page is

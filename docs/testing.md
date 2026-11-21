@@ -1,7 +1,7 @@
 ---
 name: Testing
 description: Test layers, commands, the hermetic e2e flow, the visual harness and CI
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # Testing
@@ -32,7 +32,7 @@ filter).
 
 ```sh
 pnpm typecheck        # host (tsc -b) + client + mirror check
-pnpm test             # vitest run: unit + composition + integration (196 tests)
+pnpm test             # vitest run: unit + composition + integration (199 tests)
 pnpm test:integration # only the real-persistence suite
 pnpm build            # tsc + tsdown + browser bundle -> lib/
 pnpm test:e2e         # hermetic two-instance A2A smoke (needs a built plugin)
@@ -65,7 +65,11 @@ debugging.
 4. **Outbound:** create an outbound connection on A to B and assert it reports
    `connected` with at least one tool.
 5. **Round trip:** stop A's web instance, run A's `headless` profile against a
-   mock scripted to call `a2a__b__chat`, and assert stdout is B's reply.
+   mock scripted to call `a2a__b__chat`, and assert stdout is B's reply. The
+   task is written to the runner's stdin rather than passed on the command
+   line: the profile mounts before the runner reads it, so the outbound
+   reconnect has registered its tools before the first model request (see the
+   cold-start limitation in [Harness compatibility](harness-compatibility.md)).
 6. Tear down both homes and every child process.
 
 ## Visual test
@@ -94,9 +98,9 @@ manual inspection, not a CI gate. `Ctrl+C` tears down every child and temp home.
 
 `.github/workflows/ci.yml` runs `check` (typecheck, unit, composition and
 real-persistence tests) on every push and pull request, and `e2e-pinned`
-against `dsh-v0.2.1-rc.3`. The nightly schedule and manual dispatch run the e2e
-matrix over the supported harness versions (`0.2.1-rc.3`, `0.2.1-rc.2`,
-`0.2.1-alpha.2`, `0.1.7-rc.2`).
+against `dsh-v0.2.2-rc.3`. The nightly schedule and manual dispatch run the e2e
+matrix over the supported harness versions (`0.2.2-rc.3`, `0.2.2-rc.1`, `0.2.2-alpha.2`,
+`0.2.1-rc.3`, `0.2.1-rc.2`, `0.2.1-alpha.2`, `0.1.7-rc.2`).
 
 Widen the matrix in the same change that widens `peerDependencies`, and record
 the result in [Harness compatibility](harness-compatibility.md).

@@ -27,7 +27,9 @@ import LlmRuntime, { LlmAdapter, ToolCallId, type GenerateOptions, type LlmResol
 import SessionStore from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -97,6 +99,9 @@ async function poolHarness(script: StreamChunk[][]): Promise<Harness> {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  // 0.2.2-alpha.2 requires an explicit executor in the composition; the
+  // native executor is what the shipped profiles mount.
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   // The backend mounts BEFORE the loop so root teardown unwinds the loop
   // first: live agents drain their writers into still-open handles.

@@ -79,7 +79,7 @@ directions with `curl` examples. The exact payloads are in the
 | [Harness compatibility](docs/harness-compatibility.md) | How do I move the plugin to another DSH release? |
 | [Testing](docs/testing.md) | Which test layer catches which breakage? |
 
-The manual describes `0.5.1` against DeepSeek Harness `0.2.1-rc.3`; ranges and
+The manual describes `0.5.5` against DeepSeek Harness `0.2.2-rc.3`; ranges and
 the verification record are in
 [harness compatibility](docs/harness-compatibility.md).
 

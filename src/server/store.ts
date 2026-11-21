@@ -120,8 +120,16 @@ export interface OutboundServerRecord {
   readonly lastCardAt?: string
 }
 
+/**
+ * Type the schema at the host's boundary, not by our own zod copy. The host
+ * declares its tables with its own zod (`domainTable(schema: ZodType<V>)`) and
+ * validates records with `parse`, so the runtime contract is `parse`; a sibling
+ * zod copy of another patch release must not fail the build on type identity.
+ */
+type HostValueSchema<V> = Parameters<typeof domainTable<string, V>>[0]
+
 /** JSON-encoded record schema shared by every `a2a` table. */
-const json = z.string()
+const json = z.string() as unknown as HostValueSchema<string>
 
 /** The `a2a` storage domain: JSON-encoded records, one table per record kind. */
 export const a2aDomainSpec = defineDomain({

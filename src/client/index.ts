@@ -21,6 +21,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { createElement, useEffect, useRef, useState, type ReactElement } from 'react'
 import { injectDashboardStyles } from './dashboard.css.ts'
+import { taskRowOf, type TaskRecordView } from './task-row.ts'
 import { updateCommandFor, updateStatusText, updateToneOf, type UpdateInfo } from './update-status.ts'
 
 /** Services this plugin needs from the client runtime. */
@@ -125,7 +126,7 @@ export interface ApiSnapshot {
   readonly version: string
   readonly inbounds: readonly InboundServerView[]
   readonly outbounds: readonly OutboundServerView[]
-  readonly tasks: readonly TaskView[]
+  readonly tasks: readonly TaskRecordView[]
   readonly taskTotal: number
   readonly taskNextOffset: number | null
   readonly peers: readonly InboundPeerView[]
@@ -195,16 +196,6 @@ interface InboundPeerView {
   readonly taskCount: number
   readonly activeTaskIds: readonly string[]
   readonly streaming: boolean
-}
-
-interface TaskView {
-  readonly id: string
-  readonly contextId?: string
-  readonly serverId?: string
-  readonly status?: { readonly state: string; readonly message?: { readonly parts?: readonly { readonly text?: string }[] } }
-  readonly artifacts?: readonly { readonly artifactId?: string; readonly name?: string; readonly parts?: readonly unknown[] }[]
-  readonly error?: { readonly code: string; readonly message: string }
-  readonly metadata?: { readonly skill?: string; readonly serverId?: string }
 }
 
 /** One aggregated inbound session row (mirrors the host SessionView). */
@@ -733,7 +724,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
   const inbounds = snap?.inbounds ?? []
   const outbounds = snap?.outbounds ?? []
   const peers = (snap?.peers ?? []) as readonly InboundPeerView[]
-  const tasks = (snap?.tasks ?? []) as readonly TaskView[]
+  const tasks = (snap?.tasks ?? []) as readonly TaskRecordView[]
   const sessions = (snap?.sessions ?? []) as readonly SessionView[]
   const metrics = snap?.metrics
   const editingOutbound = outbounds.find((v) => v.id === editingOut)
@@ -1358,13 +1349,16 @@ export function A2aSection(_props: SectionProps): ReactElement {
                         createElement('th', null, '操作'),
                       )),
                       createElement('tbody', null,
-                        ...tasks.map((t) => createElement('tr', { key: t.id },
-                          createElement('td', null, createElement('button', { className: 'dsh-a2a-link dsh-a2a-mono', type: 'button', onClick: () => { void openTask(t.id) } }, t.id)),
-                          createElement('td', null, t.metadata?.skill ?? '-'),
-                          createElement('td', null, t.metadata?.serverId ?? t.serverId ?? '-'),
-                          createElement('td', null, t.status?.state ?? '-'),
-                          createElement('td', null, createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: 'task.cancel', id: t.id }) } }, '取消')),
-                        )),
+                        ...tasks.map((record) => {
+                          const t = taskRowOf(record)
+                          return createElement('tr', { key: t.id },
+                            createElement('td', null, createElement('button', { className: 'dsh-a2a-link dsh-a2a-mono', type: 'button', onClick: () => { void openTask(t.id) } }, t.id)),
+                            createElement('td', null, t.skill),
+                            createElement('td', null, t.serverId),
+                            createElement('td', null, t.state),
+                            createElement('td', null, createElement('button', { className: 'dsh-a2a-btn', disabled: busy, onClick: () => { void control({ action: 'task.cancel', id: t.id }) } }, '取消')),
+                          )
+                        }),
                       ),
                     ),
                   ),

@@ -28,7 +28,7 @@ env:
   HARNESS_REPO: deepseek-ai/deepseek-harness
   # The harness version every push/PR is verified against. Keep this in sync
   # with a matrix entry below and with the compatibility record.
-  PINNED_HARNESS: dsh-v0.2.1-rc.3
+  PINNED_HARNESS: dsh-v0.2.2-rc.3
 
 jobs:
   check:
@@ -92,7 +92,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/e2e.yml
     with:
-      harness: dsh-v0.2.1-rc.3
+      harness: dsh-v0.2.2-rc.3
 
   e2e-matrix:
     name: e2e (${{ matrix.harness }})
@@ -101,6 +101,9 @@ jobs:
       fail-fast: false
       matrix:
         harness:
+          - dsh-v0.2.2-rc.3
+          - dsh-v0.2.2-rc.1
+          - dsh-v0.2.2-alpha.2
           - dsh-v0.2.1-rc.3
           - dsh-v0.2.1-rc.2
           - dsh-v0.2.1-alpha.2

@@ -84,7 +84,7 @@ function spawnService(name, command, args, options = {}) {
     cwd: options.cwd ?? HARNESS,
     env: { ...process.env, ...options.env },
     detached: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [options.stdin === 'pipe' ? 'pipe' : 'ignore', 'pipe', 'pipe'],
   })
   children.add(child)
   let out = ''
@@ -329,16 +329,21 @@ async function main() {
   await webA.service.stop()
 
   // ---- 3. model -> tool -> remote agent round trip ------------------------
-  const headless = spawnService('dsh-headless-a', 'pnpm', [
-    'dsh', 'headless',
-    'Call the tool a2a__b__chat with prompt "Reply with exactly OK", then output the tool result verbatim.',
-  ], {
+  const headless = spawnService('dsh-headless-a', 'pnpm', ['dsh', 'headless', '-'], {
     env: {
       DSH_HOME: homeA,
       DEEPSEEK_BASE_URL: `http://127.0.0.1:${portMockA}/v1`,
       DEEPSEEK_API_KEY: 'mock-key',
     },
+    stdin: 'pipe',
   })
+  // The profile mounts before the runner reads its task, so a task on stdin
+  // lets the outbound reconnect register its tools before the first model
+  // request. A task passed on the command line is spliced at mount time and
+  // can predate those tools (the harness then announces them mid-session).
+  await new Promise((resolve) => setTimeout(resolve, 2500))
+  headless.child.stdin.write('Call the tool a2a__b__chat with prompt "Reply with exactly OK", then output the tool result verbatim.')
+  headless.child.stdin.end()
   const exit = await new Promise((resolveExit) => {
     headless.child.once('exit', (code) => resolveExit(code))
   })

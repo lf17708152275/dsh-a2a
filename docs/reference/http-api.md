@@ -1,7 +1,7 @@
 ---
 name: HTTP API and A2A protocol
 description: Loopback dashboard actions, inbound JSON-RPC endpoints, SSE streaming, task states, error codes, AgentCard and outbound tool contract
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # HTTP API and A2A protocol
@@ -62,7 +62,7 @@ Snapshot example (values abbreviated):
 
 ```json
 {
-  "version": "0.5.1",
+  "version": "0.5.5",
   "inbounds": [
     {
       "id": "e2e-b-ade6a7ad",
@@ -105,8 +105,8 @@ Snapshot example (values abbreviated):
 ```json
 {
   "ok": true,
-  "current": "0.5.1",
-  "latest": "0.5.2",
+  "current": "0.5.5",
+  "latest": "0.5.3",
   "hasUpdate": true,
   "ahead": false,
   "error": null,
@@ -612,7 +612,7 @@ are never concatenated into the model-facing result. An empty result renders as
 
 ## 4. Current limits
 
-These are intentional or known at `0.5.1`:
+These are intentional or known at `0.5.5`:
 
 - `SendMessage` blocks by default; `configuration.returnImmediately: true`
   returns after starting the task. History is the task's A2A-visible input and

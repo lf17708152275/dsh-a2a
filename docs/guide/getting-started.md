@@ -1,7 +1,7 @@
 ---
 name: Getting started
 description: Install the plugin, publish an inbound A2A server, call it, and connect a remote A2A agent as a model tool
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # Getting started
@@ -15,7 +15,7 @@ is in the [HTTP API reference](../reference/http-api.md).
 
 ## Before you start
 
-You need DeepSeek Harness `0.2.1-rc.3` (the verified version; other supported
+You need DeepSeek Harness `0.2.2-rc.3` (the verified version; other supported
 0.2.x releases remain in the compatibility matrix) and a running web app,
 normally at `http://127.0.0.1:3080/`. The base `web` profile mounts every service
 the plugin uses; for a custom composition see

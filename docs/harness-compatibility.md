@@ -1,7 +1,7 @@
 ---
 name: Harness compatibility
 description: Coupling surfaces, the procedure for moving to another DeepSeek Harness release, current status and known traps
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # Harness compatibility
@@ -135,15 +135,50 @@ Publishing goes to npmjs as `@hanphone/dsh-a2a` (`publishConfig.access: public`)
 A `403` there is an npm credential problem, not a package problem. A release is
 not published without an explicit request.
 
+`lib/` is gitignored, so the artifact plane exists only after a build. `prepare`
+and `prepack` both run `scripts/ensure-lib.mjs`, which rebuilds `lib/` when it is
+missing or older than `src/`; without that hook a publish from a fresh clone — or
+an install from the git URL — would resolve `main` to a file absent from the
+package. The script also clears the incremental TypeScript cache first, because a
+surviving tsbuildinfo makes `tsc -b` no-op while `lib/` is gone.
+
+Check the packed artifact before publishing:
+
+```sh
+tar tzf dsh-a2a-<version>.tgz | grep -E '^package/lib/(index|client)\.js$'
+```
+
 ## Current status
 
-`0.5.1` is verified against harness `0.2.1-rc.3`: `pnpm typecheck` (host +
-client + mirror check), `pnpm test` (196/196), `pnpm test:integration` (6/6),
-`pnpm build` producing `lib/index.js` and `lib/client.js`, and `pnpm test:e2e`
-passing an inbound and outbound round trip against two real instances, including
-the optional trace extension's card declaration and header acknowledgement.
-`0.2.1-rc.2` remains in the matrix; `0.2.1-alpha.2` and `0.1.7-rc.2` are also
-covered by the scheduled matrix.
+`0.5.5` is verified against harness `0.2.2-rc.3`: `pnpm typecheck` (host +
+client + mirror check) with zero errors, `pnpm test` (199/199),
+`pnpm test:integration` (6/6), `pnpm build` producing `lib/index.js` and
+`lib/client.js`, and `pnpm test:e2e` passing an inbound and outbound round trip
+against two real instances, including the optional trace extension's card
+declaration and header acknowledgement. `0.2.2-rc.1` through `0.2.2-rc.3`
+vendor cordis `4.1.0` and schemastery `3.19.0`, so the cordis peer range
+admits `>=4.0.2 <4.2`, and their waterfall makes the continuation a thunk:
+`next()` takes no arguments, so an
+`a2a/inbound-task` listener passes changes by mutating the decision and the
+plugin's terminal callback closes over it. `0.2.2-alpha.2` moved the tool
+executor to an explicit composition entry and moved
+`defineContentToolFixture` to `@deepseek-ai/dsh-tool-testkit`; the integration
+harness now mounts `@deepseek-ai/dsh-tool-executor-native` and imports the
+fixture from the testkit. `0.2.2-alpha.2`, `0.2.1-rc.3` and `0.2.1-rc.2` remain
+in the matrix; `0.2.1-alpha.2` and `0.1.7-rc.2` are also covered by the
+scheduled matrix.
+
+`0.2.2-rc.2` raised the harness's own `zod` from `4.4.3` to `4.6.6`, which this
+plugin does not follow. It keeps `dependencies.zod` on the `~4.4.3` line and
+types the only place its schemas cross into the host — `a2aDomainSpec` in
+`src/server/store.ts`, passed to `domainTable()` — from the host's signature
+(`Parameters<typeof domainTable<string, V>>[0]`) instead of from its own copy.
+The host validates records with `parse`, so the runtime contract is
+version-independent; the real-persistence and e2e suites exercise that path
+against the running host. This keeps the source buildable on every harness
+generation in the matrix rather than only on the one whose zod patch level
+matches. A future release that consumes newer zod *type* features at the
+boundary must revisit the cast.
 
 ## Known traps
 
@@ -155,9 +190,11 @@ covered by the scheduled matrix.
 - **Stale manifest-less harness package residue.** Run `pnpm run clean` in the
   harness before rebuilding; tsdown's `packages/*/*` glob otherwise bundles
   leftover `lib/types` output and fails with `MISSING_EXPORT`.
-- **Two zod copies.** Pin `dependencies.zod` to the harness's line (`~4.4.3`);
-  a floating `^4.4.3` gives mutually incompatible `Config` types under
-  `exactOptionalPropertyTypes`.
+- **Two zod copies.** The host types its storage API with its own zod, so
+  schemas handed to it from another copy are not assignable even when both are
+  `4.x`. Type that one boundary from the host signature (`a2aDomainSpec` in
+  `src/server/store.ts`); do not pin `dependencies.zod` to the host's patch
+  level, which would tie the build to a single harness generation.
 - **`ERR_PNPM_NO_MATCHING_VERSION` before every script.** The harness peers have
   no registry version inside their truthful ranges. pnpm 11+ reads
   `autoInstallPeers: false` and `verifyDepsBeforeRun: false` from
@@ -179,3 +216,11 @@ covered by the scheduled matrix.
 - The plugin couples to harness packages by path through `../deepseek-harness`.
   A checkout at a different relative path needs the `tsconfig*.json` references
   updated.
+- **Cold-start tool registration.** Outbound tools appear when the reconnect's
+  AgentCard fetch resolves, and profile mounts do not wait for that fetch. A
+  one-shot headless run whose task is already on the command line (or on a
+  closed stdin) can therefore issue its first model request before those tools
+  register; the harness then announces them mid-session with a `tool-addition`
+  developer message, so the model can retry, but the first attempt fails with
+  `unknown tool`. The e2e writes the task to stdin after the profile has
+  mounted for exactly this reason.

@@ -259,7 +259,7 @@ describe('plugin composition (multi-instance)', () => {
       if (decision.parts.some((p) => 'text' in p && /veto/i.test(p.text ?? ''))) {
         decision.rejected = { reason: 'vetoed by policy' }
       }
-      return next(decision)
+      return next()
     })
     await ctx.a2a.createInboundServer({ name: 'Main', description: 'main', version: '1.0.0' })
     const view = ctx.a2a.listInboundServers()[0] as { endpointPath: string }
