@@ -5,10 +5,9 @@
  * `lib/` is gitignored, but `package.json` points `main`/`exports` at
  * `lib/index.js` and `lib/client.js`. A publish from a source checkout that
  * never ran the build, or an install from the git URL, therefore resolves to
- * files that do not exist. npm/pnpm run `prepare` on git installs and `prepack`
- * before packing, so both hooks call this script: it builds only when the
- * artifact plane is missing or older than `src/`, which keeps the second hook in
- * the same publish a no-op.
+ * files that do not exist. `prepack` runs it before packing, and a git install
+ * gets the committed artifacts directly. It builds only when the artifact plane
+ * is missing or older than `src/` and a harness checkout is available.
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
@@ -36,7 +35,7 @@ const sourceMtime = newestMtime(join(root, 'src'))
 const artifactMtime = missing.length === 0 ? Math.min(...artifacts.map((path) => statSync(path).mtimeMs)) : 0
 
 // The bundles are committed, so a git install already has an artifact plane and
-// `prepare` must not demand a build: building needs the sibling harness checkout
+// A git install must not demand a build: building needs the sibling harness checkout
 // that an installing machine does not have. Ship the committed artifacts, and
 // say so when they are older than `src/` — that combination means a contributor
 // forgot to rebuild before committing.

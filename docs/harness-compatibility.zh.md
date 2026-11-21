@@ -127,9 +127,11 @@ pnpm pack --pack-destination <dir>
 
 `lib/` 已提交进 git：两个 bundle 与 `.d.ts` 类型面随代码发布，所以
 `dsh plugin add github:…` 在没有 harness checkout 的机器上也能装（tsc 的 JavaScript
-中间产物仍然忽略）。`prepare` 与 `prepack` 都会调用 `scripts/ensure-lib.mjs`：存在同级
+中间产物仍然忽略）。`prepack` 会调用 `scripts/ensure-lib.mjs`：存在同级
 `../deepseek-harness` 时，`lib/` 缺失或比 `src/` 旧就重新构建；没有该 checkout 时直接
 使用已提交的产物，并在 `src/` 比产物新时告警——这正是「改了源码忘了重建就提交」的特征。
+这里刻意不设 `prepare`：pnpm 对 git 包会执行它，并把安装卡在「需要 allowlist 精确解析」
+上，而已提交的产物让这个钩子没有必要。
 脚本在构建前还会清掉 TypeScript 增量缓存——残留的 tsbuildinfo 会让 `tsc -b` 空转，而
 `lib/` 已经不在。
 

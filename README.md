@@ -46,9 +46,9 @@ dsh plugin --profile web add github:lf17708152275/dsh-a2a
 
 Any profile name works. The shorthand expands to
 `git+https://github.com/lf17708152275/dsh-a2a.git`; pnpm clones it and runs the
-repository's `prepare` hook, which finds the **committed `lib/` bundles** and
-skips the build — a plain install needs neither the harness source nor a
-toolchain.
+repository's committed `lib/` bundles directly — a plain install runs no build
+script, so it needs neither the harness source nor a toolchain (and no pnpm
+`allowBuilds` entry).
 
 Building from source is the part that needs the harness: `pnpm build` resolves
 `@deepseek-ai/*` through TypeScript project references into a **sibling harness

@@ -31,9 +31,9 @@ dsh plugin --profile web add github:lf17708152275/dsh-a2a
 
 The npm package `@hanphone/dsh-a2a` is the upstream release; naming only it
 installs upstream code without this fork's commits. The repository ships its
-built `lib/` bundles, so the `prepare` hook that pnpm runs during the git install
-skips the build and the install needs no harness checkout. Rebuilding from
-source does need one: `pnpm build` resolves `@deepseek-ai/*` through project
+built `lib/` bundles, so the git install carries them as-is: there is no build
+hook to run and no harness checkout to find. Rebuilding from source does need
+one: `pnpm build` resolves `@deepseek-ai/*` through project
 references into a sibling checkout at `../deepseek-harness` (see
 [install](../../README.md#install)).
 

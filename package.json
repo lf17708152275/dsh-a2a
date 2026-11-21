@@ -76,7 +76,6 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.json && tsc -p tsconfig.client.json && tsdown && node scripts/build-client.mjs",
-    "prepare": "node scripts/ensure-lib.mjs",
     "prepack": "node scripts/ensure-lib.mjs",
     "typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.client.json && tsc -p tsconfig.types.json",
     "test": "vitest run",

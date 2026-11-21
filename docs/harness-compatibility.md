@@ -139,11 +139,13 @@ not published without an explicit request.
 
 `lib/` is committed: the two bundles and the `.d.ts` surface ship in git so a
 `dsh plugin add github:…` install works without the harness checkout (tsc's
-JavaScript intermediates stay ignored). `prepare` and `prepack` both run
-`scripts/ensure-lib.mjs`: with a sibling `../deepseek-harness` present it
-rebuilds `lib/` when it is missing or older than `src/`, and without one it ships
-the committed artifacts — warning when `src/` is newer than them, which is the
-signature of a contributor who forgot to rebuild before committing. The script
+JavaScript intermediates stay ignored). `prepack` runs `scripts/ensure-lib.mjs`:
+with a sibling `../deepseek-harness` present it rebuilds `lib/` when it is missing
+or older than `src/`, and without one it ships the committed artifacts — warning
+when `src/` is newer than them, which is the signature of a contributor who
+forgot to rebuild before committing. There is deliberately no `prepare` hook:
+pnpm runs it for git-hosted packages and blocks the install until the exact
+git resolution is allowlisted, while the committed bundles make it unnecessary. The script
 also clears the incremental TypeScript cache first, because a surviving
 tsbuildinfo makes `tsc -b` no-op while `lib/` is gone.
 
