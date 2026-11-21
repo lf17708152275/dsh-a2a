@@ -23,15 +23,24 @@ the plugin uses; for a custom composition see
 
 ## Install and verify
 
+This fork installs from its own repository:
+
 ```sh
-dsh plugin --profile web add @hanphone/dsh-a2a
+dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
+
+The npm package `@hanphone/dsh-a2a` is the upstream release; naming only it
+installs upstream code without this fork's commits. The repository's `prepare`
+hook builds `lib/` during the git install, and that build resolves
+`@deepseek-ai/*` through project references into a sibling harness checkout at
+`../deepseek-harness` — without one, install the artifacts built on a machine
+that has it (see [install](../../README.md#install)).
 
 From a harness checkout, use its launcher:
 
 ```sh
 cd deepseek-harness
-pnpm dsh plugin --profile web add @hanphone/dsh-a2a
+pnpm dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 
 Restart the web app (`dsh web`, or `pnpm dsh web`). A page refresh is not

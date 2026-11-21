@@ -286,16 +286,17 @@ HTTP API。
 
 ## 升级与卸载
 
-```sh
-dsh plugin --profile web add @hanphone/dsh-a2a@latest
-```
-
-安装后重启 `dsh web`。实例与任务在域里，升级后保留；活跃会话不保留。
+先 remove 让 pnpm 重新解析提交，再加回仓库 spec（取本 fork 的 `main`）：
 
 ```sh
 dsh plugin --profile web remove @hanphone/dsh-a2a
+dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 
-卸载不会删除 `a2a` 域数据。只有确认要丢弃实例定义与任务历史时，才删除域行或存储文件。
+`add @hanphone/dsh-a2a@latest` 装的是上游 npm 发布，不是本 fork。
+
+安装后重启 `dsh web`。实例与任务在域里，升级后保留；活跃会话不保留。
+
+卸载就是上面那行 `remove`。卸载不会删除 `a2a` 域数据。只有确认要丢弃实例定义与任务历史时，才删除域行或存储文件。
 
 换到另一个 harness 版本见 [Harness 兼容性](../harness-compatibility.zh.md)。

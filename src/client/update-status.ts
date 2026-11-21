@@ -28,6 +28,14 @@ export interface UpdateInfo {
 /** Visual tone for the version-strip status text. */
 export type UpdateTone = 'pending' | 'update' | 'ok' | 'unknown'
 
+/**
+ * Where the plugin installs from: this fork's repository.
+ *
+ * `@hanphone/dsh-a2a` keeps the published identity, so the npm package and the
+ * repository share a name; only the repository spec carries fork commits.
+ */
+export const INSTALL_SPEC = 'github:lf17708152275/dsh-a2a'
+
 /** Human-readable status; a failed lookup never reads as "up to date". */
 export function updateStatusText(update: UpdateInfo | undefined, error: string | undefined): string {
   if (error !== undefined) return `检查更新失败：${error}`
@@ -50,12 +58,16 @@ export function updateToneOf(update: UpdateInfo | undefined, error: string | und
  * Two-step update command for the given profile (`remove`, then `add`).
  * A missing or malformed profile falls back to `web`; the value is only
  * displayed and copied, never executed.
+ *
+ * The install source is this fork's repository, not the npm package: the npm
+ * name resolves to the upstream release, so copying a command that names only
+ * `@hanphone/dsh-a2a` would quietly replace the fork with upstream code.
  */
 export function updateCommandFor(profile: string | null | undefined): string {
   const candidate = profile ?? ''
   const name = /^[A-Za-z0-9._-]+$/.test(candidate) ? candidate : 'web'
   return [
     `dsh plugin --profile ${name} remove @hanphone/dsh-a2a`,
-    `dsh plugin --profile ${name} add @hanphone/dsh-a2a`,
+    `dsh plugin --profile ${name} add ${INSTALL_SPEC}`,
   ].join('\n')
 }

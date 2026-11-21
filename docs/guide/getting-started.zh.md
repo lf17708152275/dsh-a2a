@@ -20,15 +20,22 @@ update-time: 2026-11-18
 
 ## 安装与验证
 
+本 fork 从自己的仓库安装：
+
 ```sh
-dsh plugin --profile web add @hanphone/dsh-a2a
+dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
+
+npm 上的 `@hanphone/dsh-a2a` 是上游发布，只写它装到的是不含本 fork 提交的上游代码。仓库的
+`prepare` 钩子会在 git 安装过程中构建 `lib/`，该构建通过 project references 解析
+`@deepseek-ai/*`，需要同级的 harness checkout（`../deepseek-harness`）；没有它时请安装
+在具备该 checkout 的机器上构建好的产物（见[安装](../../README.zh.md#安装)）。
 
 在 harness checkout 内可用它的启动器：
 
 ```sh
 cd deepseek-harness
-pnpm dsh plugin --profile web add @hanphone/dsh-a2a
+pnpm dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 
 重启 web 应用（`dsh web` 或 `pnpm dsh web`）。刷新页面不够：浏览器端 bundle 在宿主

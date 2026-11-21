@@ -342,20 +342,23 @@ Operational notes:
 
 ## Upgrade and uninstall
 
+Remove first so pnpm re-resolves the commit, then re-add the repository spec —
+that is this fork's `main`:
+
 ```sh
-dsh plugin --profile web add @hanphone/dsh-a2a@latest
+dsh plugin --profile web remove @hanphone/dsh-a2a
+dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
+
+`add @hanphone/dsh-a2a@latest` would install the upstream npm release instead of
+this fork.
 
 Restart `dsh web` after installing. Instances and tasks live in the domain and
 survive the upgrade; live sessions do not.
 
-```sh
-dsh plugin --profile web remove @hanphone/dsh-a2a
-```
-
-Removing the plugin leaves the `a2a` domain data in place. Delete the domain rows
-or the storage file only if you intend to discard instance definitions and task
-history.
+To uninstall, run the `remove` line above. Removing the plugin leaves the `a2a`
+domain data in place. Delete the domain rows or the storage file only if you
+intend to discard instance definitions and task history.
 
 Moving to another harness release is covered in
 [Harness compatibility](../harness-compatibility.md).

@@ -73,6 +73,12 @@ truthful for every tested harness version.
   in the message.
 - **Secrets stay out of the tree.** `.npmrc` and `~/.git-credentials` hold
   registry tokens; never print, copy into source or commit them.
+- **Install from this fork, not from npm.** The plugin's install source is
+  `github:lf17708152275/dsh-a2a`; the npm package `@hanphone/dsh-a2a` is the
+  upstream release. `package.json` `repository`, the install/upgrade commands in
+  the docs, and the panel's update hint all name the fork — keep them naming it
+  when merging upstream. The npm name stays the published identity (previous
+  rule); only the install spec moves.
 - **Do not push or publish without an explicit request.**
 
 Keep each rule self-contained and link the owning document instead of repeating

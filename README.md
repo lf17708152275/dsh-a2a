@@ -36,14 +36,25 @@ storage domain, not in a config file.
 
 ## Install
 
+This fork installs from its own repository. `@hanphone/dsh-a2a` on npm is the
+upstream release and does not carry this fork's commits, so an install that names
+only the npm package silently lands on upstream code:
+
 ```sh
-dsh plugin --profile web add @hanphone/dsh-a2a
+dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 
-Any profile name works. For a local tarball:
+Any profile name works. The shorthand expands to
+`git+https://github.com/lf17708152275/dsh-a2a.git`; pnpm clones it and runs the
+repository's `prepare` hook, which builds `lib/`. That build resolves
+`@deepseek-ai/*` through TypeScript project references into a **sibling harness
+checkout at `../deepseek-harness`**, so the git install needs a development
+machine that has one.
+
+Where that checkout is absent, install artifacts built elsewhere:
 
 ```sh
-pnpm build
+pnpm install && pnpm build
 npm pack
 dsh plugin --profile <name> add <path-to>/hanphone-dsh-a2a-<version>.tgz
 ```

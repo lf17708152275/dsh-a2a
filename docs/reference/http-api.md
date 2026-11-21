@@ -111,7 +111,7 @@ Snapshot example (values abbreviated):
   "ahead": false,
   "error": null,
   "source": "npm",
-  "repoUrl": "https://github.com/HanphoneJan/dsh-a2a",
+  "repoUrl": "https://github.com/lf17708152275/dsh-a2a",
   "packageName": "@hanphone/dsh-a2a",
   "checkedAt": 1790000000000,
   "cached": false,

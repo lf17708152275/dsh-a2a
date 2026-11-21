@@ -28,14 +28,22 @@ A2A agent 接入 DSH 变成模型工具。两个方向都是多实例，且完�
 
 ## 安装
 
+本 fork 从自己的仓库安装。npm 上的 `@hanphone/dsh-a2a` 是上游发布，不包含本 fork 的提交，
+只写 npm 包名的安装会静默落到上游代码：
+
 ```sh
-dsh plugin --profile web add @hanphone/dsh-a2a
+dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 
-任意 profile 名均可。本地 tarball：
+任意 profile 名均可。简写等价于 `git+https://github.com/lf17708152275/dsh-a2a.git`；pnpm
+克隆后运行仓库的 `prepare` 钩子构建 `lib/`。该构建通过 TypeScript project references
+解析 `@deepseek-ai/*`，需要**同级的 harness checkout（`../deepseek-harness`）**，因此 git
+安装需要一台具备它的开发机。
+
+没有该 checkout 时，安装别处构建好的产物：
 
 ```sh
-pnpm build
+pnpm install && pnpm build
 npm pack
 dsh plugin --profile <name> add <path-to>/hanphone-dsh-a2a-<version>.tgz
 ```

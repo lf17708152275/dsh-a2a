@@ -16,7 +16,7 @@ function info(overrides: Partial<UpdateInfo> = {}): UpdateInfo {
     ahead: false,
     error: null,
     source: 'npm',
-    repoUrl: 'https://github.com/HanphoneJan/dsh-a2a',
+    repoUrl: 'https://github.com/lf17708152275/dsh-a2a',
     cached: false,
     runtime: { node: '24.0.0', platform: 'linux', arch: 'x64', profile: 'web' },
     ...overrides,
@@ -62,8 +62,15 @@ describe('updateCommandFor', () => {
   it('uses the active profile and removes before installing', () => {
     expect(updateCommandFor('desktop')).toBe([
       'dsh plugin --profile desktop remove @hanphone/dsh-a2a',
-      'dsh plugin --profile desktop add @hanphone/dsh-a2a',
+      'dsh plugin --profile desktop add github:lf17708152275/dsh-a2a',
     ].join('\n'))
+  })
+
+  it('installs from the fork repository, never from the npm package name', () => {
+    const command = updateCommandFor('web')
+    const add = command.split('\n')[1] ?? ''
+    expect(add).toContain('github:lf17708152275/dsh-a2a')
+    expect(add).not.toContain('add @hanphone/dsh-a2a')
   })
 
   it('falls back to web for a missing or malformed profile name', () => {
