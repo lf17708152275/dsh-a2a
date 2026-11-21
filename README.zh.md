@@ -36,11 +36,14 @@ dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 
 任意 profile 名均可。简写等价于 `git+https://github.com/lf17708152275/dsh-a2a.git`；pnpm
-克隆后运行仓库的 `prepare` 钩子构建 `lib/`。该构建通过 TypeScript project references
-解析 `@deepseek-ai/*`，需要**同级的 harness checkout（`../deepseek-harness`）**，因此 git
-安装需要一台具备它的开发机。
+克隆后运行仓库的 `prepare` 钩子，该钩子发现 **仓库里已提交的 `lib/` 产物** 就跳过构建——
+普通安装既不需要 harness 源码，也不需要工具链。
 
-没有该 checkout 时，安装别处构建好的产物：
+需要 harness 的是「从源码构建」：`pnpm build` 通过 TypeScript project references 解析
+`@deepseek-ai/*`，需要**同级的 harness checkout（`../deepseek-harness`）**。改动 `src/`
+之后要在这样的环境里构建、把 `lib/` 一起提交并推送，安装方才会拿到新的 bundle。
+
+只想装某一次具体构建而不动 git URL 时：
 
 ```sh
 pnpm install && pnpm build

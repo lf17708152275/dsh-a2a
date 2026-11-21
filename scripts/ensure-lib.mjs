@@ -31,8 +31,26 @@ function newestMtime(dir) {
 }
 
 const missing = artifacts.filter((path) => !existsSync(path))
+const harness = join(root, '..', 'deepseek-harness')
 const sourceMtime = newestMtime(join(root, 'src'))
 const artifactMtime = missing.length === 0 ? Math.min(...artifacts.map((path) => statSync(path).mtimeMs)) : 0
+
+// The bundles are committed, so a git install already has an artifact plane and
+// `prepare` must not demand a build: building needs the sibling harness checkout
+// that an installing machine does not have. Ship the committed artifacts, and
+// say so when they are older than `src/` — that combination means a contributor
+// forgot to rebuild before committing.
+if (missing.length === 0 && !existsSync(harness)) {
+  if (sourceMtime > artifactMtime) {
+    console.warn(
+      '[ensure-lib] src/ is newer than the committed lib/ and ../deepseek-harness is absent; '
+      + 'shipping the committed artifacts unchanged. Rebuild where a harness checkout exists.',
+    )
+  } else {
+    console.log('[ensure-lib] lib/ is committed and ../deepseek-harness is absent; using the committed artifacts')
+  }
+  process.exit(0)
+}
 
 if (missing.length === 0 && sourceMtime <= artifactMtime) {
   console.log('[ensure-lib] lib/ is up to date; skipping build')

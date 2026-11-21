@@ -74,6 +74,13 @@ truthful for every tested harness version.
 - **Version bumps are deliberate.** Bump `package.json` `version` in the same
   commit as the compatibility adaptation, and state the verified harness version
   in the message.
+- **Commit `lib/` with every `src/` change.** `lib/index.js`, `lib/client.js` and
+  `lib/types/**/*.d.ts` are tracked (tsc's JavaScript intermediates are not), so
+  `dsh plugin add github:…` installs work without a `../deepseek-harness`
+  checkout: `scripts/ensure-lib.mjs` ships the committed bundles instead of
+  building. A `src/` edit that lands without the matching rebuild leaves every
+  installer on the previous bundles — build where the checkout exists, commit the
+  artifacts with the change, and check that `ensure-lib` did not just warn.
 - **Secrets stay out of the tree.** `.npmrc` and `~/.git-credentials` hold
   registry tokens; never print, copy into source or commit them.
 - **Install from this fork, not from npm.** The plugin's install source is

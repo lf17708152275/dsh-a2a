@@ -125,11 +125,13 @@ pnpm pack --pack-destination <dir>
 仍然有效）。那里的
 `403` 是 npm 凭据问题，不是包问题。没有明确要求不发布。
 
-`lib/` 被 gitignore，只有构建之后才存在。`prepare` 与 `prepack` 都会调用
-`scripts/ensure-lib.mjs`：当 `lib/` 缺失或比 `src/` 旧时重新构建。没有这个钩子时，
-从全新 clone 发布、或从 git URL 安装，`main` 会指向包里并不存在的文件。脚本在构建前
-还会清掉 TypeScript 增量缓存——残留的 tsbuildinfo 会让 `tsc -b` 空转，而 `lib/` 已
-经不在了。
+`lib/` 已提交进 git：两个 bundle 与 `.d.ts` 类型面随代码发布，所以
+`dsh plugin add github:…` 在没有 harness checkout 的机器上也能装（tsc 的 JavaScript
+中间产物仍然忽略）。`prepare` 与 `prepack` 都会调用 `scripts/ensure-lib.mjs`：存在同级
+`../deepseek-harness` 时，`lib/` 缺失或比 `src/` 旧就重新构建；没有该 checkout 时直接
+使用已提交的产物，并在 `src/` 比产物新时告警——这正是「改了源码忘了重建就提交」的特征。
+脚本在构建前还会清掉 TypeScript 增量缓存——残留的 tsbuildinfo 会让 `tsc -b` 空转，而
+`lib/` 已经不在。
 
 发布前检查打包产物：
 

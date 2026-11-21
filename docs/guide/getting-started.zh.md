@@ -26,10 +26,10 @@ update-time: 2026-11-18
 dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 
-npm 上的 `@hanphone/dsh-a2a` 是上游发布，只写它装到的是不含本 fork 提交的上游代码。仓库的
-`prepare` 钩子会在 git 安装过程中构建 `lib/`，该构建通过 project references 解析
-`@deepseek-ai/*`，需要同级的 harness checkout（`../deepseek-harness`）；没有它时请安装
-在具备该 checkout 的机器上构建好的产物（见[安装](../../README.zh.md#安装)）。
+npm 上的 `@hanphone/dsh-a2a` 是上游发布，只写它装到的是不含本 fork 提交的上游代码。仓库里
+已经提交了构建好的 `lib/` 产物，因此 pnpm 在 git 安装时跑的 `prepare` 钩子会跳过构建，安装
+不需要 harness checkout。从源码重建才需要：`pnpm build` 通过 project references 把
+`@deepseek-ai/*` 解析到同级 checkout（`../deepseek-harness`，见[安装](../../README.zh.md#安装)）。
 
 在 harness checkout 内可用它的启动器：
 

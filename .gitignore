@@ -145,7 +145,15 @@ vite.config.ts.timestamp-*
 # dsh-a2a build output (independent project: @deepseek-ai/* stay peer deps
 # provided by the host composition). The standalone pnpm lockfile IS committed
 # so CI can install with --frozen-lockfile and reproduce the toolchain.
-lib/
+#
+# `lib/index.js`, `lib/client.js` and `lib/types/**/*.d.ts` ARE committed:
+# `dsh plugin add github:…` runs `prepare`, and that build needs a sibling
+# harness checkout the installing machine will not have. Only tsc's JavaScript
+# intermediates stay out of the tree.
+lib/types/**/*.js
+lib/types/**/*.js.map
+lib/types/**/*.d.ts.map
+lib/*.bak-*
 
 # local-only dev scaffolding (scratch verification scripts, never published)
 scripts/local/

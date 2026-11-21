@@ -137,12 +137,15 @@ npmjs is the upstream release, and publishing the fork under it is out of scope
 A `403` there is an npm credential problem, not a package problem. A release is
 not published without an explicit request.
 
-`lib/` is gitignored, so the artifact plane exists only after a build. `prepare`
-and `prepack` both run `scripts/ensure-lib.mjs`, which rebuilds `lib/` when it is
-missing or older than `src/`; without that hook a publish from a fresh clone — or
-an install from the git URL — would resolve `main` to a file absent from the
-package. The script also clears the incremental TypeScript cache first, because a
-surviving tsbuildinfo makes `tsc -b` no-op while `lib/` is gone.
+`lib/` is committed: the two bundles and the `.d.ts` surface ship in git so a
+`dsh plugin add github:…` install works without the harness checkout (tsc's
+JavaScript intermediates stay ignored). `prepare` and `prepack` both run
+`scripts/ensure-lib.mjs`: with a sibling `../deepseek-harness` present it
+rebuilds `lib/` when it is missing or older than `src/`, and without one it ships
+the committed artifacts — warning when `src/` is newer than them, which is the
+signature of a contributor who forgot to rebuild before committing. The script
+also clears the incremental TypeScript cache first, because a surviving
+tsbuildinfo makes `tsc -b` no-op while `lib/` is gone.
 
 Check the packed artifact before publishing:
 
