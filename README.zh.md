@@ -63,9 +63,9 @@ dsh plugin --profile <name> add <path-to>/hanphone-dsh-a2a-<version>.tgz
 | [架构](docs/architecture.zh.md) | 宿主半区、manager、存储与浏览器半区如何组成？ |
 | [Harness 兼容性](docs/harness-compatibility.zh.md) | 换 DSH 版本时要做哪些事？ |
 | [测试](docs/testing.zh.md) | 哪一层测试能抓住哪类问题？ |
-| [中文深度手册](docs/manual-zh/README.md) | 按架构、协议、运维、开发展开的实现手册（含图） |
+| [中文文档（站点）](https://docs.hanphone.cn/docs/项目/dsh-a2a.html) | 安装、接口、运维与架构，含图 |
 
-手册描述 `0.5.1` 在 DeepSeek Harness `0.2.1-rc.3` 上的行为；版本范围与验证记录见
+手册描述 `0.5.5` 在 DeepSeek Harness `0.2.2-rc.3` 上的行为；版本范围与验证记录见
 [Harness 兼容性](docs/harness-compatibility.zh.md)。
 
 ## 开发

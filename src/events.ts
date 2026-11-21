@@ -64,13 +64,15 @@ declare module '@deepseek-ai/cordis' {
     /**
      * Policy seam for one inbound task, dispatched as a waterfall before the
      * task starts. Listeners mutate the decision (attach `requiresApproval`,
-     * set `rejected`) and MUST call `next(decision)` to delegate; returning
-     * without `next()` short-circuits and the returned value is final.
+     * set `rejected`) and MUST call `next()` to delegate; returning without
+     * `next()` short-circuits and the returned value is final. Harness 0.2.2-rc.1
+     * (cordis 4.1.0) made the continuation a thunk that takes no arguments, so
+     * listeners pass their changes by mutating `decision`.
      * @mode waterfall
      * @param decision — the mutable task decision.
      * @param next - delegate the (possibly mutated) decision downstream.
      * @returns the final decision after all listeners.
      */
-    'a2a/inbound-task'(this: unknown, decision: InboundTaskDecision, next: (d: InboundTaskDecision) => Promise<InboundTaskDecision> | InboundTaskDecision): Promise<InboundTaskDecision>
+    'a2a/inbound-task'(this: unknown, decision: InboundTaskDecision, next: () => Promise<InboundTaskDecision> | InboundTaskDecision): Promise<InboundTaskDecision>
   }
 }

@@ -1,7 +1,7 @@
 ---
 name: Troubleshooting
 description: Diagnose empty replies, 401s, unreachable cards, failed outbound connections, missing tools, version refusals and storage conflicts
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # Troubleshooting
@@ -154,7 +154,7 @@ for two-instance tests.
 
 ## What to include in a bug report
 
-- Plugin version (`0.5.1`), harness version and OS.
+- Plugin version (`0.5.5`), harness version and OS.
 - The exact command or panel action.
 - The task JSON (`/a2a task get <id>`) and the AgentCard.
 - Whether the inbound instance has auth, and whether the request carried the

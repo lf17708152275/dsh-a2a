@@ -1,7 +1,7 @@
 ---
 name: 快速开始
 description: 安装插件、发布一个入站 A2A server、调用它，并把远端 A2A agent 接入为模型工具
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # 快速开始
@@ -14,7 +14,7 @@ update-time: 2026-10-25
 
 ## 开始之前
 
-需要 DeepSeek Harness `0.2.1-rc.3`（已核对版本；其他受支持的 0.2.x 仍在兼容矩阵中）和运行中的 web 应用，
+需要 DeepSeek Harness `0.2.2-rc.3`（已核对版本；其他受支持的 0.2.x 仍在兼容矩阵中）和运行中的 web 应用，
 默认地址为 `http://127.0.0.1:3080/`。基础 `web` profile 已挂载插件用到的全部服务；
 自定义组合见[宿主服务](operations.zh.md#宿主服务)。
 

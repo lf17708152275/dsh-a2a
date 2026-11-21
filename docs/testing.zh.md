@@ -1,7 +1,7 @@
 ---
 name: 测试
 description: 测试分层、命令、hermetic e2e 流程、可视化测试与 CI
-update-time: 2026-10-25
+update-time: 2026-11-18
 ---
 
 # 测试
@@ -29,7 +29,7 @@ update-time: 2026-10-25
 
 ```sh
 pnpm typecheck        # 宿主（tsc -b）+ 客户端 + 镜像检查
-pnpm test             # vitest run：单元 + 组合 + 集成（196 项）
+pnpm test             # vitest run：单元 + 组合 + 集成（199 项）
 pnpm test:integration # 只跑真实持久化套件
 pnpm build            # tsc + tsdown + 浏览器 bundle -> lib/
 pnpm test:e2e         # 双实例 A2A hermetic 冒烟（需要已构建插件）
@@ -57,7 +57,9 @@ pnpm test:all         # typecheck + test + build + test:e2e
    artifact 是 mock 的文本。
 4. **出站：** 在 A 上创建到 B 的出站连接，断言状态为 `connected` 且至少有一个工具。
 5. **往返：** 停掉 A 的 web 实例，用 A 的 `headless` profile 跑一个被脚本化成调用
-   `a2a__b__chat` 的 mock，断言 stdout 是 B 的回复。
+   `a2a__b__chat` 的 mock，断言 stdout 是 B 的回复。任务通过 runner 的 stdin 写入，
+   而不是命令行参数：profile 先挂载、runner 后读取，出站连接因此能在第一次模型请求
+   之前注册好工具（见 [Harness 兼容性](harness-compatibility.zh.md) 的冷启动限制）。
 6. 拆除两个 home 与所有子进程。
 
 ## 可视化测试
@@ -83,9 +85,9 @@ pnpm test:all         # typecheck + test + build + test:e2e
 ## CI
 
 `.github/workflows/ci.yml` 在每次 push 与 pull request 跑 `check`（类型检查、单元、
-组合、真实持久化测试），以及针对 `dsh-v0.2.1-rc.3` 的 `e2e-pinned`。夜间定时与手动
-触发会跑 e2e 矩阵，覆盖支持的 harness 版本（`0.2.1-rc.3`、`0.2.1-rc.2`、
-`0.2.1-alpha.2`、`0.1.7-rc.2`）。
+组合、真实持久化测试），以及针对 `dsh-v0.2.2-rc.3` 的 `e2e-pinned`。夜间定时与手动
+触发会跑 e2e 矩阵，覆盖支持的 harness 版本（`0.2.2-rc.3`、`0.2.2-rc.1`、`0.2.2-alpha.2`、
+`0.2.1-rc.3`、`0.2.1-rc.2`、`0.2.1-alpha.2`、`0.1.7-rc.2`）。
 
 放宽 `peerDependencies` 的同一次改动里同步放宽矩阵，并把结果记到
 [Harness 兼容性](harness-compatibility.zh.md)。
