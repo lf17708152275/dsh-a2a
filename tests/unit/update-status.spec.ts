@@ -61,7 +61,7 @@ describe('updateToneOf', () => {
 describe('updateCommandFor', () => {
   it('uses the active profile and removes before installing', () => {
     expect(updateCommandFor('desktop')).toBe([
-      'dsh plugin --profile desktop remove @hanphone/dsh-a2a',
+      'dsh plugin --profile desktop remove @lf17708152275/dsh-a2a',
       'dsh plugin --profile desktop add github:lf17708152275/dsh-a2a',
     ].join('\n'))
   })

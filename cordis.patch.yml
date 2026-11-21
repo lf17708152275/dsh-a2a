@@ -1,8 +1,8 @@
-# @hanphone/dsh-a2a bundle patch: mount the plugin as one row, enabled by
+# @lf17708152275/dsh-a2a bundle patch: mount the plugin as one row, enabled by
 # default. v1.0 instances are NOT patch-configured — inbound/outbound server
 # instances are created, preset-bound, and enabled/disabled entirely from the
 # GUI (persisted in the a2a domain); this row only mounts the plugin core.
 - insert:
     - id: a2a
-      name: '@hanphone/dsh-a2a'
+      name: '@lf17708152275/dsh-a2a'
       config: {}

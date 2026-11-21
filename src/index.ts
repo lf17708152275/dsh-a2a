@@ -1,5 +1,5 @@
 /**
- * @hanphone/dsh-a2a — Cordis plugin entry.
+ * @lf17708152275/dsh-a2a — Cordis plugin entry.
  *
  * Mounts the A2A v1.0.1 dual-end plugin as a MULTI-INSTANCE composition: an
  * arbitrary set of inbound A2A servers (each a preset-bound session pool, its

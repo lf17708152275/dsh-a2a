@@ -105,7 +105,7 @@ reasoning block；它不是 A2A 线协议的一部分，也不会通过 A2A 暴�
   "error": null,
   "source": "npm",
   "repoUrl": "https://github.com/lf17708152275/dsh-a2a",
-  "packageName": "@hanphone/dsh-a2a",
+  "packageName": "@lf17708152275/dsh-a2a",
   "checkedAt": 1790000000000,
   "cached": false,
   "runtime": { "node": "24.20.0", "platform": "linux", "arch": "x64", "profile": "web" }
@@ -407,7 +407,7 @@ data: {"jsonrpc":"2.0","id":2,"result":{"artifactUpdate":{...}}}
 策略允许、且客户端用标准请求头激活时才生效：
 
 ```http
-A2A-Extensions: https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md
+A2A-Extensions: https://github.com/lf17708152275/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md
 ```
 
 响应在 `A2A-Extensions` 中回显已激活的 URI。trace 数据只放在
@@ -490,7 +490,7 @@ A2A-Extensions: https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/ds
     "stateTransitionHistory": false,
     "extensions": [
       {
-        "uri": "https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md",
+        "uri": "https://github.com/lf17708152275/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md",
         "description": "可选工具调用 trace metadata。",
         "required": false
       }

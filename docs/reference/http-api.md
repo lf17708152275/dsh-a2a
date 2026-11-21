@@ -112,7 +112,7 @@ Snapshot example (values abbreviated):
   "error": null,
   "source": "npm",
   "repoUrl": "https://github.com/lf17708152275/dsh-a2a",
-  "packageName": "@hanphone/dsh-a2a",
+  "packageName": "@lf17708152275/dsh-a2a",
   "checkedAt": 1790000000000,
   "cached": false,
   "runtime": { "node": "24.20.0", "platform": "linux", "arch": "x64", "profile": "web" }
@@ -454,7 +454,7 @@ extension. It is **off** unless the instance policy allows it and the client
 activates it with the standard request header:
 
 ```http
-A2A-Extensions: https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md
+A2A-Extensions: https://github.com/lf17708152275/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md
 ```
 
 The response echoes the activated URI in `A2A-Extensions`. Trace data lives only
@@ -546,7 +546,7 @@ of the protocol table but are not emitted by the inbound dispatcher.
     "stateTransitionHistory": false,
     "extensions": [
       {
-        "uri": "https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md",
+        "uri": "https://github.com/lf17708152275/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md",
         "description": "Optional tool-call trace metadata.",
         "required": false
       }

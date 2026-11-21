@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.schema.json",
+  "$id": "https://github.com/lf17708152275/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.schema.json",
   "title": "dsh-trace/v1 metadata",
   "oneOf": [
     { "$ref": "#/$defs/live" },

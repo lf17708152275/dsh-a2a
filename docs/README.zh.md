@@ -1,6 +1,6 @@
 ---
 name: 文档
-description: @hanphone/dsh-a2a 手册——安装、概念、运维、HTTP API、排障、架构、兼容性与测试
+description: @lf17708152275/dsh-a2a 手册——安装、概念、运维、HTTP API、排障、架构、兼容性与测试
 update-time: 2026-11-18
 ---
 
@@ -8,7 +8,7 @@ update-time: 2026-11-18
 
 [English](README.md) · **中文**
 
-`@hanphone/dsh-a2a` 是 DeepSeek Harness 的 A2A v1.0.1 双端插件：入站 server
+`@lf17708152275/dsh-a2a` 是 DeepSeek Harness 的 A2A v1.0.1 双端插件：入站 server
 把 DSH agent 发布出去，出站连接把远端 A2A 技能变成模型工具。
 
 手册描述插件 `0.5.5` 在 DeepSeek Harness `0.2.2-rc.3` 上的行为。
@@ -36,7 +36,7 @@ update-time: 2026-11-18
 
 ## 版本与事实来源
 
-- 插件：`@hanphone/dsh-a2a` `0.5.5`
+- 插件：`@lf17708152275/dsh-a2a` `0.5.5`
 - 已核对：DeepSeek Harness `0.2.2-rc.3`；e2e 矩阵同时覆盖
   `0.2.2-rc.1`、`0.2.2-alpha.2`、`0.2.1-rc.3`、`0.2.1-rc.2`、
   `0.2.1-alpha.2` 与 `0.1.7-rc.2`

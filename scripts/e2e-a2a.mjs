@@ -40,8 +40,8 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const HARNESS = resolve(process.env.DSH_A2A_HARNESS_DIR ?? join(REPO, '..', 'deepseek-harness'))
 const PLUGIN_DIR = REPO
 const PLUGIN_LIB = join(REPO, 'lib', 'index.js')
-const PKG_NAME = '@hanphone/dsh-a2a'
-const TRACE_URI = 'https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md'
+const PKG_NAME = '@lf17708152275/dsh-a2a'
+const TRACE_URI = 'https://github.com/lf17708152275/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md'
 const KEEP = process.env.DSH_A2A_KEEP === '1'
 
 /** Child processes to tear down (process groups). */

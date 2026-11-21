@@ -131,7 +131,9 @@ version in the message, and produce the tarball:
 pnpm pack --pack-destination <dir>
 ```
 
-Publishing goes to npmjs as `@hanphone/dsh-a2a` (`publishConfig.access: public`).
+This fork is installed from its repository, not from npm: `@hanphone/dsh-a2a` on
+npmjs is the upstream release, and publishing the fork under it is out of scope
+(`publishConfig.access: public` still applies if a fork release is ever packed).
 A `403` there is an npm credential problem, not a package problem. A release is
 not published without an explicit request.
 

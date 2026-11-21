@@ -31,8 +31,9 @@ export type UpdateTone = 'pending' | 'update' | 'ok' | 'unknown'
 /**
  * Where the plugin installs from: this fork's repository.
  *
- * `@hanphone/dsh-a2a` keeps the published identity, so the npm package and the
- * repository share a name; only the repository spec carries fork commits.
+ * Upstream publishes to npm as `@hanphone/dsh-a2a`; this fork carries its own
+ * package name, so an install that names the npm package can never be mistaken
+ * for the fork.
  */
 export const INSTALL_SPEC = 'github:lf17708152275/dsh-a2a'
 
@@ -67,7 +68,7 @@ export function updateCommandFor(profile: string | null | undefined): string {
   const candidate = profile ?? ''
   const name = /^[A-Za-z0-9._-]+$/.test(candidate) ? candidate : 'web'
   return [
-    `dsh plugin --profile ${name} remove @hanphone/dsh-a2a`,
+    `dsh plugin --profile ${name} remove @lf17708152275/dsh-a2a`,
     `dsh plugin --profile ${name} add ${INSTALL_SPEC}`,
   ].join('\n')
 }

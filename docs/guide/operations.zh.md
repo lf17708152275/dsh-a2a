@@ -289,7 +289,7 @@ HTTP API。
 先 remove 让 pnpm 重新解析提交，再加回仓库 spec（取本 fork 的 `main`）：
 
 ```sh
-dsh plugin --profile web remove @hanphone/dsh-a2a
+dsh plugin --profile web remove @lf17708152275/dsh-a2a
 dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 

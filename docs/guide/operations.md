@@ -346,7 +346,7 @@ Remove first so pnpm re-resolves the commit, then re-add the repository spec —
 that is this fork's `main`:
 
 ```sh
-dsh plugin --profile web remove @hanphone/dsh-a2a
+dsh plugin --profile web remove @lf17708152275/dsh-a2a
 dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```
 

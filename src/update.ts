@@ -208,7 +208,7 @@ function githubPackageUrls(repoUrl: string | null): string[] {
 async function fetchJson(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<unknown> {
   const response = await fetchImpl(url, {
     signal: AbortSignal.timeout(timeoutMs),
-    headers: { accept: 'application/json', 'user-agent': '@hanphone/dsh-a2a update-check' },
+    headers: { accept: 'application/json', 'user-agent': '@lf17708152275/dsh-a2a update-check' },
   })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   return await response.json()
@@ -237,7 +237,7 @@ function runtimeVersions(): RuntimeVersions {
 export function createUpdateChecker(options: UpdateCheckerOptions): UpdateChecker {
   const meta = readPackageMeta(options.packageRoot)
   const current = meta.version ?? ''
-  const packageName = meta.name ?? '@hanphone/dsh-a2a'
+  const packageName = meta.name ?? '@lf17708152275/dsh-a2a'
   const repoUrl = meta.repoUrl
   const cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS

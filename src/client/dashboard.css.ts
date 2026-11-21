@@ -9,7 +9,7 @@
  * @module dsh-a2a/client/dashboard.css
  */
 
-export const DASHBOARD_CSS_ID = '@hanphone/dsh-a2a/dashboard.css'
+export const DASHBOARD_CSS_ID = '@lf17708152275/dsh-a2a/dashboard.css'
 
 const css = String.raw`
 /* ── layout ─────────────────────────────────────────────── */

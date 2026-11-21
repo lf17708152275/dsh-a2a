@@ -1,6 +1,6 @@
 ---
 name: Documentation
-description: Manual for @hanphone/dsh-a2a — installation, concepts, operations, HTTP API, troubleshooting, architecture, compatibility and testing
+description: Manual for @lf17708152275/dsh-a2a — installation, concepts, operations, HTTP API, troubleshooting, architecture, compatibility and testing
 update-time: 2026-11-18
 ---
 
@@ -8,7 +8,7 @@ update-time: 2026-11-18
 
 **English** · [中文](README.zh.md)
 
-`@hanphone/dsh-a2a` is the A2A v1.0.1 dual-end plugin for DeepSeek Harness.
+`@lf17708152275/dsh-a2a` is the A2A v1.0.1 dual-end plugin for DeepSeek Harness.
 Inbound servers publish DSH agents; outbound connections expose remote A2A
 skills as model tools.
 
@@ -35,7 +35,7 @@ The manual describes plugin `0.5.5` on DeepSeek Harness `0.2.2-rc.3`.
 
 ## Versions and source of truth
 
-- Plugin: `@hanphone/dsh-a2a` `0.5.5`
+- Plugin: `@lf17708152275/dsh-a2a` `0.5.5`
 - Verified against: DeepSeek Harness `0.2.2-rc.3`; the e2e matrix also covers
   `0.2.2-rc.1`, `0.2.2-alpha.2`, `0.2.1-rc.3`, `0.2.1-rc.2`,
   `0.2.1-alpha.2` and `0.1.7-rc.2`

@@ -6,7 +6,7 @@ procedure is in [harness compatibility](docs/harness-compatibility.md).
 
 ## What this repository is
 
-`@hanphone/dsh-a2a` is an independent, open-source Agent2Agent (A2A) v1.0.1
+`@lf17708152275/dsh-a2a` is an independent, open-source Agent2Agent (A2A) v1.0.1
 dual-end plugin for DeepSeek Harness. It mounts as one Cordis row (`a2a`) and
 publishes multiple inbound servers plus multiple outbound connections. Instances
 are created and managed from the GUI and persisted in the `a2a` domain, not in
@@ -66,8 +66,11 @@ truthful for every tested harness version.
   it runs inside someone else's profile composition.
 - **The codebase is written in English.** Public docs are an EN/ZH pair; update
   both sides together and keep the `**English** · [中文](…)` switcher.
-- **`@hanphone/dsh-a2a` is the published identity.** `scripts/build-client.mjs`
-  and `cordis.patch.yml` read it; renaming it is a breaking release.
+- **`@lf17708152275/dsh-a2a` is this fork's package identity.** `scripts/build-client.mjs`,
+  `cordis.patch.yml`, the profile's plugin row and the panel's update hint all read
+  it. It is installed from the repository, never from npm, so renaming it moves
+  every installed profile (remove, then re-add). The npm package `@hanphone/dsh-a2a`
+  belongs to upstream and is not this fork.
 - **Version bumps are deliberate.** Bump `package.json` `version` in the same
   commit as the compatibility adaptation, and state the verified harness version
   in the message.
@@ -75,10 +78,9 @@ truthful for every tested harness version.
   registry tokens; never print, copy into source or commit them.
 - **Install from this fork, not from npm.** The plugin's install source is
   `github:lf17708152275/dsh-a2a`; the npm package `@hanphone/dsh-a2a` is the
-  upstream release. `package.json` `repository`, the install/upgrade commands in
-  the docs, and the panel's update hint all name the fork — keep them naming it
-  when merging upstream. The npm name stays the published identity (previous
-  rule); only the install spec moves.
+  upstream release. `package.json` `repository`, the package name, the
+  install/upgrade commands in the docs and the panel's update hint all name the
+  fork — keep them naming it when merging upstream.
 - **Do not push or publish without an explicit request.**
 
 Keep each rule self-contained and link the owning document instead of repeating

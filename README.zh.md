@@ -2,7 +2,7 @@
 
 Agent2Agent（A2A）v1.0.1 双端插件，用于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — [English](README.md) · **中文**
 
-`@hanphone/dsh-a2a` 把 DeepSeek Harness 的 agent 通过 A2A 发布出去，也把远端
+`@lf17708152275/dsh-a2a` 把 DeepSeek Harness 的 agent 通过 A2A 发布出去，也把远端
 A2A agent 接入 DSH 变成模型工具。两个方向都是多实例，且完全在设置面板里管理：
 实例存于 `a2a` 存储域，不写在配置文件里。
 
@@ -45,7 +45,7 @@ dsh plugin --profile web add github:lf17708152275/dsh-a2a
 ```sh
 pnpm install && pnpm build
 npm pack
-dsh plugin --profile <name> add <path-to>/hanphone-dsh-a2a-<version>.tgz
+dsh plugin --profile <name> add <path-to>/lf17708152275-dsh-a2a-<version>.tgz
 ```
 
 安装后重启 web 应用；浏览器端 bundle 在宿主启动时扫描。

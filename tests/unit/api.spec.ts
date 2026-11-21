@@ -87,7 +87,7 @@ function updateStub(overrides: Partial<UpdateInfo> = {}): UpdateChecker {
   const current = '0.4.0'
   return {
     current,
-    packageName: '@hanphone/dsh-a2a',
+    packageName: '@lf17708152275/dsh-a2a',
     repoUrl: 'https://github.com/HanphoneJan/dsh-a2a',
     check: vi.fn(async (_force?: boolean): Promise<UpdateInfo> => ({
       ok: true,
@@ -98,7 +98,7 @@ function updateStub(overrides: Partial<UpdateInfo> = {}): UpdateChecker {
       error: null,
       source: 'npm',
       repoUrl: 'https://github.com/HanphoneJan/dsh-a2a',
-      packageName: '@hanphone/dsh-a2a',
+      packageName: '@lf17708152275/dsh-a2a',
       checkedAt: 1,
       cached: false,
       runtime: { node: 'v24.0.0', platform: 'linux', arch: 'x64', profile: 'web' },

@@ -120,7 +120,9 @@ dsh plugin revoke-version <pkg@version> --dsh-version <runtime>
 pnpm pack --pack-destination <dir>
 ```
 
-发布目标是 npmjs 的 `@hanphone/dsh-a2a`（`publishConfig.access: public`）。那里的
+本 fork 从仓库安装，不发布到 npm：npmjs 上的 `@hanphone/dsh-a2a` 是上游发布，
+把 fork 发布到那个名字下不在范围内（若真要打包发布，`publishConfig.access: public`
+仍然有效）。那里的
 `403` 是 npm 凭据问题，不是包问题。没有明确要求不发布。
 
 `lib/` 被 gitignore，只有构建之后才存在。`prepare` 与 `prepack` 都会调用

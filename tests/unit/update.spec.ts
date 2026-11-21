@@ -20,7 +20,7 @@ function packageRoot(version = '0.4.0'): string {
   const root = mkdtempSync(join(tmpdir(), 'dsh-a2a-update-'))
   roots.push(root)
   writeFileSync(join(root, 'package.json'), JSON.stringify({
-    name: '@hanphone/dsh-a2a',
+    name: '@lf17708152275/dsh-a2a',
     version,
     repository: { type: 'git', url: 'git+https://github.com/HanphoneJan/dsh-a2a.git' },
   }))

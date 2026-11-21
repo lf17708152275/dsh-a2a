@@ -1,5 +1,5 @@
 {
-  "name": "@hanphone/dsh-a2a",
+  "name": "@lf17708152275/dsh-a2a",
   "version": "0.5.5",
   "description": "Agent2Agent (A2A) v1.0.1 dual-end plugin for DeepSeek Harness: multiple inbound servers (per-instance agent presets; skills derived from each preset's skill directory), multiple outbound connections, GUI-managed instance lifecycle.",
   "type": "module",

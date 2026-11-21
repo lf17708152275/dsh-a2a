@@ -10,7 +10,7 @@
 import type { AgentExtension } from '../protocol.ts'
 
 /** Stable extension URI; a breaking schema change needs a new URI. */
-export const TRACE_EXTENSION_URI = 'https://github.com/hanphone/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md'
+export const TRACE_EXTENSION_URI = 'https://github.com/lf17708152275/dsh-a2a/blob/main/docs/extensions/dsh-trace/v1.md'
 
 /** Per-task trace bounds. The extension spec documents both. */
 export const TRACE_MAX_CALLS = 64

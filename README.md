@@ -2,7 +2,7 @@
 
 Agent2Agent (A2A) v1.0.1 dual-end plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — **English** · [中文](README.zh.md)
 
-`@hanphone/dsh-a2a` publishes DeepSeek Harness agents over A2A and brings
+`@lf17708152275/dsh-a2a` publishes DeepSeek Harness agents over A2A and brings
 remote A2A agents into DSH as model tools. Both directions are multi-instance
 and are managed entirely from the Settings UI: instances live in the `a2a`
 storage domain, not in a config file.
@@ -56,7 +56,7 @@ Where that checkout is absent, install artifacts built elsewhere:
 ```sh
 pnpm install && pnpm build
 npm pack
-dsh plugin --profile <name> add <path-to>/hanphone-dsh-a2a-<version>.tgz
+dsh plugin --profile <name> add <path-to>/lf17708152275-dsh-a2a-<version>.tgz
 ```
 
 Restart the web app after installing; the browser bundle is scanned at host
