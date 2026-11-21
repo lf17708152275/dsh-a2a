@@ -237,6 +237,9 @@ export function apply(ctx: Context, config: A2AConfig) {
         subagentProvider,
         inboundTrace: config.inboundTrace,
         newId: () => crypto.randomUUID().slice(0, 8),
+        get webPort() {
+          return String(webServerPort(webServer) ?? process.env['DSH_A2A_PORT'] ?? '3000')
+        },
       }
       const inboundManager = new InboundServerManager(inboundHost, new DomainInboundStore(domain.inbound_servers))
       await inboundManager.boot()

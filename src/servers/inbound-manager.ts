@@ -99,6 +99,12 @@ export interface InboundManagerHost {
   }) => void | Promise<void>
   /** Allocate a fresh stable instance id. */
   readonly newId: () => string
+  /**
+   * TCP port the host web server listens on. Used to complete an advertised
+   * `baseUrl` that omits its port (`http://10.10.10.2` → `http://10.10.10.2:53793`).
+   * Absent = advertise every base URL exactly as configured.
+   */
+  readonly webPort?: string
 }
 
 /** Effective per-instance working directory: record override, else deployment default. */
@@ -207,6 +213,32 @@ export function validateBaseUrl(raw: string | undefined): { readonly ok: true; r
 /** Per-instance advertised base URL, or the deployment default. */
 export function resolveInstanceBaseUrl(record: Pick<InboundServerRecord, 'baseUrl'>, deploymentBaseUrl: string): string {
   return record.baseUrl ?? deploymentBaseUrl
+}
+
+/**
+ * Complete an advertised base URL with the host web server's port when the
+ * value omits one.
+ *
+ * `http://10.10.10.2` is the shape people type to mean "this machine", but the
+ * A2A routes still answer on the web server's own port, so a port-less base URL
+ * advertises port 80 — where nothing listens — in both the agent card and the
+ * dashboard. `https` keeps its implicit 443: a TLS deployment normally
+ * terminates at a reverse proxy that owns that port. Explicit ports always win.
+ */
+export function withAdvertisedPort(baseUrl: string, webPort: string | undefined): string {
+  if (baseUrl === 'auto' || webPort === undefined) return baseUrl
+  const port = webPort.trim()
+  // 80/443 are already implied by the scheme; anything else has to be spelled out.
+  if (port.length === 0 || port === '80' || port === '443') return baseUrl
+  let parsed: URL
+  try {
+    parsed = new URL(baseUrl)
+  } catch {
+    return baseUrl
+  }
+  if (parsed.port !== '' || parsed.protocol !== 'http:') return baseUrl
+  parsed.port = port
+  return parsed.toString().replace(/\/$/, '')
 }
 
 /** Resolve the host's base-URL source (a getter lets the GUI retune it). */
@@ -396,7 +428,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
   // the deployment default if it is concrete, else a loopback placeholder (the
   // served card is rebuilt per request, so this only feeds facade snapshots).
   const staticAutoFallback = deploymentBaseUrl === 'auto' ? 'http://127.0.0.1' : deploymentBaseUrl
-  const card = buildCard({ ...cardOptions, baseUrl: autoBaseUrl ? staticAutoFallback : configuredBaseUrl })
+  const card = buildCard({ ...cardOptions, baseUrl: autoBaseUrl ? staticAutoFallback : withAdvertisedPort(configuredBaseUrl, host.webPort) })
 
   // One preset-bound session pool per instance. The instance id is part of the
   // derived session id so two instances cannot share a DSH session just
@@ -462,7 +494,7 @@ function assemble(record: InboundServerRecord, skills: readonly AgentSkill[], au
   const server = new A2AServer({
     card,
     ...(autoBaseUrl
-      ? { cardForRequest: (req) => buildCard({ ...cardOptions, baseUrl: deriveBaseUrlFromRequest(req) ?? staticAutoFallback }) }
+      ? { cardForRequest: (req) => buildCard({ ...cardOptions, baseUrl: withAdvertisedPort(deriveBaseUrlFromRequest(req) ?? staticAutoFallback, host.webPort) }) }
       : {}),
     store: tasks,
     executors,

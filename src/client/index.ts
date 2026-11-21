@@ -752,10 +752,31 @@ export function A2aSection(_props: SectionProps): ReactElement {
       .catch(() => setNotice('复制不了，请手动选中命令'))
   }
 
-  /** 卡片内展开的 AgentCard JSON 面板。 */
+  /**
+ * Complete a displayed address with the port this dashboard is served on.
+ *
+ * A per-instance `baseUrl` is often typed as `http://10.10.10.2` while the A2A
+ * routes still answer on the web server's own port, so an unqualified address
+ * would point at port 80 where nothing listens. The host also fills the port
+ * into the agent card; this keeps the card on screen honest when the panel and
+ * the host half are not the same build.
+ */
+const withDisplayPort = (url: string): string => {
+  if (typeof location === 'undefined' || location.port === '') return url
+  try {
+    const parsed = new URL(url)
+    if (parsed.port !== '' || parsed.protocol !== 'http:') return url
+    parsed.port = location.port
+    return parsed.toString().replace(/\/$/, '')
+  } catch {
+    return url
+  }
+}
+
+/** 卡片内展开的 AgentCard JSON 面板。 */
   const renderInlineCardPanel = (v: InboundServerView): ReactElement => {
     const origin = typeof location !== 'undefined' ? location.origin : ''
-    const cardUrl = `${v.cardUrl ?? `${origin}${v.endpointPath}`}/agent-card.json`
+    const cardUrl = `${withDisplayPort(v.cardUrl ?? `${origin}${v.endpointPath}`)}/agent-card.json`
     return createElement('div', { className: 'dsh-a2a-inline-panel' },
       h('AgentCard JSON'),
       createElement('pre', { className: 'dsh-a2a-detail' }, cardView !== undefined ? JSON.stringify(cardView, null, 2) : '读取中…'),
@@ -1061,7 +1082,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
                         (() => {
                           // 对外地址：服务端在 baseUrl 具体时会给出通告地址（cardUrl）；auto 模式下按当前页面 origin 推算
                           const origin = typeof location !== 'undefined' ? location.origin : ''
-                          const endpointUrl = v.cardUrl ?? `${origin}${v.endpointPath}`
+                          const endpointUrl = withDisplayPort(v.cardUrl ?? `${origin}${v.endpointPath}`)
                           const cardUrl = `${endpointUrl}/agent-card.json`
                           const loopback = /^https?:\/\/(127\.\d+\.\d+\.\d+|localhost|\[::1\])(?::\d+)?(\/|$)/i.test(endpointUrl)
                           const copy = (text: string) => () => {
