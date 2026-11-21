@@ -71,4 +71,20 @@ describe('taskOutputText', () => {
     }))
     expect(value).toBe('result detail')
   })
+
+  it('concatenates streamed text fragments instead of one line per fragment', () => {
+    // A peer that appends one part per delta (and never coalesces them) is the
+    // wire shape this renders: joining with a newline printed one word per line.
+    const fragments = ['链', '路', '自', '检', '通过'].map((text) => ({ text }))
+    const value = taskOutputText(task({ artifacts: [{ artifactId: 'result', parts: fragments }] }))
+    expect(value).toBe('链路自检通过')
+    expect(value).not.toContain('\n')
+  })
+
+  it('keeps a structured result part on its own line after streamed text', () => {
+    const value = taskOutputText(task({
+      artifacts: [{ artifactId: 'result', parts: [{ text: '前面' }, { text: '的话' }, { data: { answer: 42 } }, { text: '尾巴' }] }],
+    }))
+    expect(value).toBe('前面的话{"answer":42}\n尾巴')
+  })
 })

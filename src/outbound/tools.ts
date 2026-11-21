@@ -152,6 +152,45 @@ function textOf(task: Task): string {
 }
 
 /**
+ * Concatenate an artifact's text parts.
+ *
+ * A2A parts are fragments of one content sequence, not lines: a streaming peer
+ * emits one small text part per delta (`append: true`), and a peer that never
+ * coalesced them stores hundreds of parts. Joining those with a separator is
+ * what printed every token on its own line, so fragments are concatenated
+ * verbatim and only whole artifacts are separated.
+ */
+function textOfParts(parts: readonly Part[]): string {
+  let text = ''
+  for (const part of parts) {
+    if ('text' in part && typeof part.text === 'string') text += part.text
+  }
+  return text
+}
+
+/**
+ * Render the designated `result` artifact. Text fragments concatenate; a
+ * non-text part (structured `data`, `file`) is a deliberate result unit and
+ * starts its own line.
+ */
+function renderResultArtifact(artifact: { readonly parts?: readonly Part[] }): string {
+  const lines: string[] = []
+  let pending = ''
+  for (const part of artifact.parts ?? []) {
+    if ('text' in part && typeof part.text === 'string') {
+      pending += part.text
+      continue
+    }
+    const rendered = partsToText([part])
+    if (rendered.length === 0) continue
+    lines.push(pending + rendered)
+    pending = ''
+  }
+  if (pending.length > 0) lines.push(pending)
+  return lines.join('\n')
+}
+
+/**
  * Select model-facing output from a remote task. The designated `result`
  * artifact wins (structured `data` parts there are a legitimate result); any
  * other artifact contributes text parts only, so tool-call or diagnostic data
@@ -162,11 +201,10 @@ export function taskOutputText(task: Task): string {
   const visible = artifacts.filter((artifact) => artifact.metadata?.[TRACE_EXTENSION_URI] === undefined && artifact.artifactId !== 'dsh-a2a/trace')
   const result = visible.filter((artifact) => artifact.artifactId === 'result')
   if (result.length > 0) {
-    return result.flatMap((artifact) => artifact.parts ?? []).map((part) => partsToText([part])).filter(Boolean).join('\n').trim()
+    return result.map((artifact) => renderResultArtifact(artifact)).filter(Boolean).join('\n').trim()
   }
   return visible
-    .flatMap((artifact) => artifact.parts ?? [])
-    .map((part) => ('text' in part && typeof part.text === 'string' ? part.text : ''))
+    .map((artifact) => textOfParts(artifact.parts ?? []))
     .filter((text) => text.length > 0)
     .join('\n')
     .trim()
