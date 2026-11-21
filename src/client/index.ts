@@ -755,7 +755,7 @@ export function A2aSection(_props: SectionProps): ReactElement {
   /** 卡片内展开的 AgentCard JSON 面板。 */
   const renderInlineCardPanel = (v: InboundServerView): ReactElement => {
     const origin = typeof location !== 'undefined' ? location.origin : ''
-    const cardUrl = `${origin}${v.endpointPath}/agent-card.json`
+    const cardUrl = `${v.cardUrl ?? `${origin}${v.endpointPath}`}/agent-card.json`
     return createElement('div', { className: 'dsh-a2a-inline-panel' },
       h('AgentCard JSON'),
       createElement('pre', { className: 'dsh-a2a-detail' }, cardView !== undefined ? JSON.stringify(cardView, null, 2) : '读取中…'),
@@ -1059,13 +1059,29 @@ export function A2aSection(_props: SectionProps): ReactElement {
                           createElement('span', { className: 'dsh-a2a-auth' }, v.authTokenEnv !== undefined ? '· 已配置鉴权' : '· 匿名'),
                         ),
                         (() => {
-                          // 非编辑态展示完整对外 URL：当前页面 origin + 端点路径，最接近外部 A2A 客户端拿到的地址
+                          // 对外地址：服务端在 baseUrl 具体时会给出通告地址（cardUrl）；auto 模式下按当前页面 origin 推算
                           const origin = typeof location !== 'undefined' ? location.origin : ''
-                          const fullUrl = `${origin}${v.endpointPath}`
-                          return createElement('div', {
-                            className: 'dsh-a2a-card-sub dsh-a2a-mono',
-                            title: `完整地址：${fullUrl}\nAgent Card：${fullUrl}/agent-card.json`,
-                          }, fullUrl)
+                          const endpointUrl = v.cardUrl ?? `${origin}${v.endpointPath}`
+                          const cardUrl = `${endpointUrl}/agent-card.json`
+                          const loopback = /^https?:\/\/(127\.\d+\.\d+\.\d+|localhost|\[::1\])(?::\d+)?(\/|$)/i.test(endpointUrl)
+                          const copy = (text: string) => () => {
+                            void navigator.clipboard?.writeText(text).catch(() => undefined)
+                          }
+                          return createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' } },
+                            createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono', title: 'A2A JSON-RPC 端点，任务 POST 到这里' },
+                              `端点 ${endpointUrl}`,
+                              createElement('button', { className: 'dsh-a2a-btn', style: { marginLeft: '6px', fontSize: '11px' }, onClick: copy(endpointUrl) }, '复制'),
+                            ),
+                            createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono', title: '把这个 AgentCard 地址交给外部 agent 导入' },
+                              `卡片 ${cardUrl}`,
+                              createElement('button', { className: 'dsh-a2a-btn', style: { marginLeft: '6px', fontSize: '11px' }, onClick: copy(cardUrl) }, '复制'),
+                            ),
+                            loopback
+                              ? createElement('div', { className: 'dsh-a2a-card-sub', style: { color: '#e5484d' } },
+                                  '仅本机可达：外部 agent 访问不到这个回环地址，需反代/隧道或让 web 服务监听局域网地址',
+                                )
+                              : null,
+                          )
                         })(),
                         v.workspace !== undefined
                           ? createElement('div', { className: 'dsh-a2a-card-sub dsh-a2a-mono' }, `cwd: ${v.workspace}`)
